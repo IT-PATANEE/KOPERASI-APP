@@ -1,0 +1,2 @@
+E:/KoperasiFlutter/koperasi_app_130568TEST/android/app/.cxx/Debug/44u38r5s/x86/CMakeFiles/edit_cache.dir
+E:/KoperasiFlutter/koperasi_app_130568TEST/android/app/.cxx/Debug/44u38r5s/x86/CMakeFiles/rebuild_cache.dir

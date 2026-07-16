@@ -42,4 +42,13 @@
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
+    <!-- anita add 140868 -->
+    <!-- <uses-permission android:name="android.permission.INTERNET" />
+    Android 13 (API 33) ขึ้นไป
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" /> -->
+    <!-- anita end 140868 -->
+
+
+
 </manifest>
