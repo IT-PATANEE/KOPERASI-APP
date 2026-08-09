@@ -3,18 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:koperasiapp/constants.dart';
 // import 'package:image_picker/image_picker.dart'; // 📌 สำหรับเปิดกล้อง/อัลบั้มเพื่อเปลี่ยนรูป
 
-class MemberInfoPage extends StatefulWidget {
+class ProfilePage extends StatefulWidget {
   final String member_no;
   final String br_no;
 
-  const MemberInfoPage(
+  const ProfilePage(
       {super.key, required this.member_no, required this.br_no});
 
   @override
-  State<MemberInfoPage> createState() => _MemberInfoPageState();
+  State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _MemberInfoPageState extends State<MemberInfoPage> {
+class _ProfilePageState extends State<ProfilePage> {
   File? _imageFile; // เก็บไฟล์รูปภาพที่ผู้ใช้เลือกเปลี่ยน
   late String _memberNo;
   late String _branchNo;

@@ -4,20 +4,41 @@ import 'package:flutter/material.dart';
 import 'package:koperasiapp/constants.dart';
 import 'package:koperasiapp/screen/depositStatement_page.dart';
 import 'package:koperasiapp/screen/load_qrcode_page.dart';
-import 'package:koperasiapp/screen/member_info_page.dart';
+import 'package:koperasiapp/screen/profile_page.dart';
 import 'package:page_transition/page_transition.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 
 class SettingPage extends StatefulWidget {
-  const SettingPage({super.key});
+  final String member_no;
+  final String br_no;
+  final String token;
+
+  const SettingPage(
+      {super.key,
+      required this.member_no,
+      required this.br_no,
+      required this.token});
 
   @override
   State<SettingPage> createState() => _SettingPageState();
 }
 
 class _SettingPageState extends State<SettingPage> {
+  late String _memberNo;
+  late String _branchNo;
+  late String _token;
+
+  @override
+  void initState() {
+    super.initState();
+    _memberNo = widget.member_no;
+    _branchNo = widget.br_no;
+    _token = widget.token; // <-- เพิ่มบรรทัดนี้เพื่อเก็บค่า Token ไว้ใช้งาน
+    print("กำลังส่งข้อมูล: member_no=$_memberNo, br_no=$_branchNo");
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
@@ -82,7 +103,11 @@ class _SettingPageState extends State<SettingPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) => const MemberInfoPage(member_no: '', br_no: '',)),
+                                builder: (context) => ProfilePage(
+                                      member_no: _memberNo,
+                                      br_no: _branchNo,
+                                      token: _token,
+                                    )),
                           );
                         },
                       ),

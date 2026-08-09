@@ -34,7 +34,7 @@ class _HomeState extends State<Home> {
       HomePage(member_no: widget.member_no, br_no: widget.br_no, token: widget.token),
       AccPage(member_no: widget.member_no, br_no: widget.br_no),
       const ReceiptPage(),
-      const SettingPage(),
+      SettingPage(member_no: widget.member_no, br_no: widget.br_no, token: widget.token),
     ];
   }
 
