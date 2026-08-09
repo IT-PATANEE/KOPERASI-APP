@@ -4,9 +4,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:koperasiapp/constants.dart';
 import 'package:http/http.dart' as http;
-import 'package:koperasiapp/screen/depositStatement_page.dart';
 import 'package:koperasiapp/screen/loanStatement_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class LoanPage extends StatefulWidget {
   final String member_no;
@@ -19,14 +19,11 @@ class LoanPage extends StatefulWidget {
 }
 
 class _LoanPageState extends State<LoanPage> {
-  // Future<Map<String, dynamic>>? LoanData;
-
   List<Map<String, dynamic>> _loans = [];
-  bool _isLoading = true; // สถานะการโหลดข้อมูล
+  bool _isLoading = true;
 
   late String _memberNo;
   late String _branchNo;
-  String _token = '';
 
   @override
   void initState() {
@@ -38,16 +35,11 @@ class _LoanPageState extends State<LoanPage> {
 
   Future<void> fetchLoanData() async {
     setState(() {
-      _isLoading = true; // แสดงสถานะการโหลดข้อมูล
+      _isLoading = true;
     });
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token =
-        prefs.getString('token'); // Get the token from SharedPreferences
-
-    if (token != null && token.isNotEmpty) {
-      _token = token;
-    }
+    String? token = prefs.getString('token');
 
     String url = 'https://online.iscop.co.th/ws/MobileApp/loan.php';
     String fullUrl = '$url?member_no=$_memberNo&br_no=$_branchNo&token=$token';
@@ -56,34 +48,31 @@ class _LoanPageState extends State<LoanPage> {
       final response = await http.get(
         Uri.parse(fullUrl),
         headers: {
-          'Authorization': 'Bearer $token', // Send token in headers
+          'Authorization': 'Bearer $token',
         },
       );
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = json.decode(response.body);
 
-        // ตรวจสอบว่าข้อมูลใน jsonResponse เป็นไปตามที่คาดหวัง
         if (jsonResponse['success'] == 1 && jsonResponse['data'] != null) {
-          // หรือค่าที่เหมาะสมที่แสดงความสำเร็จ
           setState(() {
             _loans = List<Map<String, dynamic>>.from(jsonResponse['data']);
             _isLoading = false;
           });
         } else {
           setState(() {
-            _loans = []; // ตั้งค่าให้เป็นลิสต์ว่างกรณีไม่มีข้อมูล
+            _loans = [];
             _isLoading = false;
           });
-          print(
-              'Error: ${jsonResponse['message']}'); // ถ้ามีข้อความผิดพลาดใน JSON
+          print('Error: ${jsonResponse['message']}');
         }
       } else {
         throw Exception('Failed to load data');
       }
     } catch (error) {
       setState(() {
-        _loans = []; // ตั้งค่าให้เป็นลิสต์ว่างในกรณีเกิดข้อผิดพลาด
+        _loans = [];
         _isLoading = false;
       });
     }
@@ -91,115 +80,116 @@ class _LoanPageState extends State<LoanPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      // home: Scaffold(
-        backgroundColor: Constants.bg,
-        appBar: AppBar(
-          backgroundColor: Constants.primaryColor,
-          title: const Center(
-            child: Text(
-              'สินเชื่อ',
-              style:
-                  TextStyle(fontWeight: FontWeight.w500, color: Colors.white),
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Constants.greenColors,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        centerTitle: true,
+        title: Text(
+          'สินเชื่อ',
+          style: theme.textTheme.titleLarge!.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _loans.isEmpty
-                ? const Center(
-                    child: Text(
-                      'ไม่พบข้อมูลสินเชื่อ',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  )
-                : Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: Column(
-                      children: [
-                        const Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.stop,
-                              color: Color.fromARGB(255, 0, 87, 31),
-                              size: 30.0,
-                            ),
-                            Text(
-                              'สินเชื่อของฉัน',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(
-                          height: 20.0,
-                        ),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _loans.length,
-                            itemBuilder: (context, index) {
-                              final loan =
-                                  _loans[index]; // ข้อมูลบัญชีแต่ละรายการ
-
-                              return Column(
-                                children: [
-                                  InkWell(
-                                    onTap: () {
-                                      // เมื่อกด LoanCard จะเปลี่ยนหน้าไปยัง LoanDetailPage พร้อมส่งข้อมูล
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              LoanstatementPage(
-                                            loanNo: loan['loan_no'],
-                                            loanId: loan['loan_no_th'],
-                                            member_no: _memberNo,
-                                            br_no: _branchNo,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    child: LoanCard(
-                                      text1: loan['loan_no_th'],
-                                      text2: loan['balance'],
-                                      text3: loan['period_total'],
-                                      text4: loan['period_pay'],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                ],
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+      ),
+      body: _isLoading
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Constants.greenColors,
+              ),
+            )
+          : _loans.isEmpty
+              ? const Center(
+                  child: Text(
+                    'ไม่พบข้อมูลสินเชื่อ',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey,
                     ),
                   ),
-      // ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.stop,
+                            color: Constants.greenColors,
+                            size: 24.0,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'สินเชื่อของฉัน',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 15.0),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _loans.length,
+                          itemBuilder: (context, index) {
+                            final loan = _loans[index];
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 15.0),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => LoanstatementPage(
+                                        loanNo: loan['loan_no'] ?? '',
+                                        loanId: loan['loan_no_th'] ?? '',
+                                        member_no: _memberNo,
+                                        br_no: _branchNo,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: LoanCard(
+                                  text1: loan['loan_no_th'] ?? '',
+                                  text2: loan['balance'] ?? '',
+                                  text3: loan['period_total'] ?? '',
+                                  text4: loan['period_pay'] ?? '',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
     );
   }
 }
 
-// ShareCard STYLE
-// ACC CARD STYLE
+// LoanCard STYLE
 class LoanCard extends StatelessWidget {
-  final String text1;
-  final String text2;
-  final String text3;
-  final String text4;
+  final String text1; // loan_no_th
+  final String text2; // balance
+  final String text3; // period_total
+  final String text4; // period_pay
 
   const LoanCard({
     super.key,
@@ -211,164 +201,141 @@ class LoanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var mediaSize = MediaQuery.of(context).size;
+    final formatter = NumberFormat('#,##0.00');
+    final double? parsedVal = double.tryParse(text2.replaceAll(',', ''));
+    final String formattedBalance =
+        parsedVal != null ? formatter.format(parsedVal) : text2;
+
     return Container(
-        height: mediaSize.height * 0.23,
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [
-              BoxShadow(
-                  color: Color(0xFFe8e8e8),
-                  blurRadius: 10.0,
-                  offset: Offset(0, 5))
-            ]),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Column(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.15),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Row 1: Loan Contract No
+          Text(
+            text1,
+            softWrap: true,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12.0),
+
+          // Row 2: Remaining Loan Balance Label & Amount
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Expanded(
-                  flex: 2,
-                  child: Container(
-                    color: Colors.white,
-                    child: Stack(
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: Padding(
-                            padding: EdgeInsets.all(15.0),
-                            child: Column(
-                              // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      text1,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'สินเชื่อคงเหลือ',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.normal,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(
-                                  height: 10.0,
-                                ),
-                                Divider(),
-                                const SizedBox(
-                                  height: 10.0,
-                                ),
-                                Column(
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          '',
-                                          // style: const TextStyle(
-                                          //   fontSize: 16,
-                                          //   fontWeight: FontWeight.bold,
-                                          // ),
-                                        ),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              text2,
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(
-                                      height: 10.0,
-                                    ),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'จำนวนงวด',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.normal,
-                                          ),
-                                        ),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              text3,
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.normal,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(
-                                      height: 10.0,
-                                    ),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          'ชำระต่องวด',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.normal,
-                                          ),
-                                        ),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              text4,
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.normal,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+              Text(
+                'สินเชื่อคงเหลือ',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    formattedBalance,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Constants.greenColors,
                     ),
-                  )),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'บาท',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-        ));
+          const SizedBox(height: 14.0),
+
+          // Divider Line
+          Divider(
+            color: Colors.grey.withValues(alpha: 0.15),
+            height: 1,
+          ),
+          const SizedBox(height: 12.0),
+
+          // Row 3: Period Total
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'จำนวนงวด',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Text(
+                text3,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8.0),
+
+          // Row 4: Period Pay
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'ชำระต่องวด',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Text(
+                text4,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
+
