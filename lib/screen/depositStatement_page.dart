@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:koperasiapp/constants.dart';
-import 'package:koperasiapp/screen/depositStatement_page.dart';
-import 'package:koperasiapp/screen/share_page%20copy.dart';
-import 'package:page_transition/page_transition.dart';
+import 'package:koperasiapp/screen/share_page.dart';
+import 'package:koperasiapp/screen/selecttransfer_page.dart';
+import 'package:koperasiapp/screen/selectqrcode_page.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class DepositStatementPage extends StatefulWidget {
   final String memberNo;
@@ -30,7 +31,6 @@ class _DepositStatementPageState extends State<DepositStatementPage> {
   late String _memberNo;
   late String _branchNo;
   late String _accountNo;
-  String _token = '';
   Map<String, dynamic>? _depositStatementData;
   String serverResponse = 'กำลังรอข้อมูลจากเซิร์ฟเวอร์...';
 
@@ -40,19 +40,12 @@ class _DepositStatementPageState extends State<DepositStatementPage> {
     _branchNo = widget.branchNo;
     _accountNo = widget.accountNo;
     super.initState();
-    fetchStatementData(); // เรียกข้อมูลเมื่อหน้าเริ่มต้น
+    fetchStatementData();
   }
 
   Future<void> fetchStatementData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token =
-        prefs.getString('token'); // Get the token from SharedPreferences
-
-    if (token != null && token.isNotEmpty) {
-      setState(() {
-        _token = token; // Store token in a variable
-      });
-    }
+    String? token = prefs.getString('token');
 
     String url =
         'https://online.iscop.co.th/ws/MobileApp/deposit_statement.php';
@@ -63,7 +56,7 @@ class _DepositStatementPageState extends State<DepositStatementPage> {
       final response = await http.get(
         Uri.parse(fullUrl),
         headers: {
-          'Authorization': 'Bearer $token', // Send token in headers
+          'Authorization': 'Bearer $token',
         },
       );
 
@@ -71,14 +64,10 @@ class _DepositStatementPageState extends State<DepositStatementPage> {
         final Map<String, dynamic> jsonResponse = json.decode(response.body);
         if (jsonResponse['success'] == 1) {
           setState(() {
-            _depositStatementData =
-                jsonResponse['data']; // เก็บทั้ง master และ statement
-            // print(
-            //     'Share Data: $_taawoonData');
+            _depositStatementData = jsonResponse['data'];
           });
         } else {
-          print(
-              'Error: ${jsonResponse['message']}'); // ถ้ามีข้อความผิดพลาดใน JSON
+          print('Error: ${jsonResponse['message']}');
         }
       } else {
         throw Exception('Failed to load data');
@@ -90,49 +79,59 @@ class _DepositStatementPageState extends State<DepositStatementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Constants.bg,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Constants.primaryColor,
-        title: const Center(
-          child: Text(
-            'บัญชีออมทรัพย์',
-            style: TextStyle(fontWeight: FontWeight.w500, color: Colors.white),
-          ),
-        ),
+        backgroundColor: Constants.greenColors,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () {
             Navigator.pop(context);
           },
         ),
+        centerTitle: true,
+        title: Text(
+          'บัญชีออมทรัพย์',
+          style: theme.textTheme.titleLarge!.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   Icon(
                     Icons.stop,
-                    color: Color.fromARGB(255, 0, 87, 31),
-                    size: 30.0,
+                    color: Constants.greenColors,
+                    size: 24.0,
                   ),
-                  Text(
+                  const SizedBox(width: 8),
+                  const Text(
                     'บัญชีเงินฝาก',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20.0),
-              // Check if _taawoonData is available before rendering ShareCard
+              const SizedBox(height: 15.0),
               _depositStatementData == null
-                  ? const CircularProgressIndicator()
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        color: Constants.greenColors,
+                      ),
+                    )
                   : (_depositStatementData!['master'] != null &&
                           _depositStatementData!['master'].isNotEmpty
                       ? DepositCard(
@@ -150,65 +149,58 @@ class _DepositStatementPageState extends State<DepositStatementPage> {
                               '',
                           text5:
                               _depositStatementData!['master']['balance'] ?? '',
-                          // text6: _depositStatementData!['master']
-                          //         ['available'] ??
-                          //     '',
-                          // text7: _depositStatementData!['master']
-                          //         ['available'] ??
-                          //     '',
                         )
-                      : const Text('No master data available')),
+                      : const Text('ไม่พบข้อมูลบัญชี')),
               const SizedBox(height: 20.0),
-              Column(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      BuildMenuButton(
-                        imagePath: 'assets/images/icon-menu/pay.png',
-                        title: 'โอนเงินฝาก',
-                        nextPage: const SharePage(
-                          member_no: '',
-                          br_no: '',
-                        ),
-                        memberNo: _memberNo,
-                        branchNo: _branchNo,
-                      ),
-                      BuildMenuButton(
-                        imagePath: 'assets/images/icon-menu/trans_bank.png',
-                        title: 'โอนไปยังธนาคาร',
-                        nextPage: const SharePage(
-                          member_no: '',
-                          br_no: '',
-                        ),
-                        memberNo: _memberNo,
-                        branchNo: _branchNo,
-                      ),
-                      BuildMenuButton(
-                        imagePath: 'assets/images/icon-menu/ot.png',
-                        title: 'เมนูอื่น ๆ',
-                        nextPage: const SharePage(
-                          member_no: '',
-                          br_no: '',
-                        ),
-                        memberNo: _memberNo,
-                        branchNo: _branchNo,
-                      ),
-                    ],
+                  BuildMenuButton(
+                    imagePath: 'assets/images/icon-menu/icon_01.png',
+                    title: 'โอน-ชำระ',
+                    nextPage: SelectTransferPage(
+                      member_no: _memberNo,
+                      br_no: _branchNo,
+                      token: widget.token,
+                    ),
+                    memberNo: _memberNo,
+                    branchNo: _branchNo,
+                  ),
+                  BuildMenuButton(
+                    imagePath: 'assets/images/icon-menu/icon_09.png',
+                    title: 'โอนเงินไปยังธนาคาร',
+                    nextPage: SharePage(
+                      member_no: _memberNo,
+                      br_no: _branchNo,
+                    ),
+                    memberNo: _memberNo,
+                    branchNo: _branchNo,
+                  ),
+                  BuildMenuButton(
+                    imagePath: 'assets/images/icon-menu/icon_06.png',
+                    title: 'QR Code',
+                    nextPage: SelectQrcodePage(
+                      member_no: _memberNo,
+                      br_no: _branchNo,
+                    ),
+                    memberNo: _memberNo,
+                    branchNo: _branchNo,
                   ),
                 ],
               ),
-              const SizedBox(height: 20.0),
+              const SizedBox(height: 25.0),
               Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         'รายการย้อนหลัง',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.normal,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                       Row(
@@ -216,47 +208,53 @@ class _DepositStatementPageState extends State<DepositStatementPage> {
                         children: [
                           Icon(
                             Icons.filter_list_outlined,
-                            color: Color.fromARGB(255, 0, 0, 0),
+                            color: Colors.grey.shade700,
                             size: 20.0,
                           ),
+                          const SizedBox(width: 4),
                           Text(
                             'ตัวกรอง',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.normal,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade700,
                             ),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20.0),
-                  // Check if statement data is available
+                  const SizedBox(height: 15.0),
                   if (_depositStatementData != null &&
                       _depositStatementData!['statement'] is List &&
                       _depositStatementData!['statement'].isNotEmpty) ...[
-                    // Convert the statement data to the correct format
                     DepositStatementCard(
                       statementItems: List<Map<String, dynamic>>.from(
-                          _depositStatementData!['statement'].map((item) => Map<
-                                  String, dynamic>.from(
-                              item))), //แปลงข้อมูลที่ได้รับจาก _taawoonData ให้อยู่ในรูปแบบที่สามารถใช้งานได้ใน TaawoonStatementCard
-                    ),
-                  ] else ...[
-                    const Text('ไม่พบข้อมูล'),
-                  ],
-                  const SizedBox(height: 10.0),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'สิ้นสุดรายการทั้งหมด',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.normal,
+                        _depositStatementData!['statement'].map(
+                          (item) => Map<String, dynamic>.from(item),
                         ),
                       ),
-                    ],
+                    ),
+                  ] else ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20.0),
+                      child: Center(
+                        child: Text(
+                          'ไม่พบข้อมูลรายการย้อนหลัง',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20.0),
+                  Center(
+                    child: Text(
+                      'สิ้นสุดรายการทั้งหมด',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -286,8 +284,6 @@ class BuildMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var mediaSize = MediaQuery.of(context).size;
-
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -302,17 +298,38 @@ class BuildMenuButton extends StatelessWidget {
       },
       child: Column(
         children: [
-          Image.asset(
-            imagePath,
-            height: mediaSize.height * 0.1,
-            fit: BoxFit.cover,
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Image.asset(
+              imagePath,
+              height: 38,
+              width: 38,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.widgets_outlined,
+                color: Constants.greenColors,
+                size: 28,
+              ),
+            ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 8),
           Text(
             title,
             style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.normal,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
             ),
           ),
         ],
@@ -323,14 +340,11 @@ class BuildMenuButton extends StatelessWidget {
 
 // ACC CARD STYLE
 class DepositCard extends StatelessWidget {
-  final String text1;
-  final String text2;
-  final String text3;
-  final String text4;
-  final String text5;
-  // final String text6;
-  // final String text7;
-  // final String text4;
+  final String text1; // account_name
+  final String text2; // available
+  final String text3; // account_no
+  final String text4; // account_desc
+  final String text5; // balance
 
   const DepositCard({
     Key? key,
@@ -339,208 +353,137 @@ class DepositCard extends StatelessWidget {
     required this.text3,
     required this.text4,
     required this.text5,
-    // required this.text6,
-    // required this.text7,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    var mediaSize = MediaQuery.of(context).size;
+    final formatter = NumberFormat('#,##0.00');
+    final double? parsedVal = double.tryParse(text2.replaceAll(',', ''));
+    final String formattedAvailable =
+        parsedVal != null ? formatter.format(parsedVal) : text2;
+    final String cleanDesc = text4.replaceAll('บัญชี', '').trim();
+
     return Container(
-        // height: mediaSize.height * 0.35,
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [
-              BoxShadow(
-                  color: Color(0xFFe8e8e8),
-                  blurRadius: 10.0,
-                  offset: Offset(0, 5))
-            ]),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: IntrinsicHeight(
-            child: Column(
-              children: [
-                Container(
-                  color: Colors.white,
-                  child: Stack(
-                    children: [
-                      Expanded(
-                        flex: 1,
-                        child: Padding(
-                          padding: const EdgeInsets.all(15.0),
-                          child: Column(
-                            // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    text1,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'ยอดเงินคงเหลือ',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(
-                                height: 10.0,
-                              ),
-                              const Divider(),
-                              const SizedBox(
-                                height: 10.0,
-                              ),
-                              Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        '',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.normal,
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            text2,
-                                            style: const TextStyle(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(
-                                    height: 10.0,
-                                  ),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'เลขที่บัญชี',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.normal,
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            text3,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.normal,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(
-                                    height: 10.0,
-                                  ),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'ประเภทบัญชี',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.normal,
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            text4,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.normal,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(
-                                    height: 10.0,
-                                  ),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'ยอดเงินที่ถอนได้',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.normal,
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            text5,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.normal,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(
-                                    height: 10.0,
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+      width: double.infinity,
+      padding: const EdgeInsets.all(18.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.15),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Row 1: Account Name (Allows wrapping if name is long)
+          Text(
+            text1,
+            softWrap: true,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
           ),
-        ));
+          const SizedBox(height: 12.0),
+
+          // Row 2: Account Number & Tag Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                text3,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              if (cleanDesc.isNotEmpty)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Constants.greenColors.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    cleanDesc,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Constants.greenColors,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14.0),
+
+          // Divider Line
+          Divider(
+            color: Colors.grey.withValues(alpha: 0.15),
+            height: 1,
+          ),
+          const SizedBox(height: 12.0),
+
+          // Row 3: Withdrawable Balance Label & Amount
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                'ยอดเงินที่ถอนได้',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    formattedAvailable,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Constants.greenColors,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'บาท',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
 // DepositStatementCard STYLE
 class DepositStatementCard extends StatelessWidget {
-  final List<Map<String, dynamic>> statementItems; // รับรายการ statement
+  final List<Map<String, dynamic>> statementItems;
 
   const DepositStatementCard({
     Key? key,
@@ -550,145 +493,244 @@ class DepositStatementCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.15),
+          width: 1.0,
+        ),
+        boxShadow: [
           BoxShadow(
-              color: Color(0xFFe8e8e8), blurRadius: 10.0, offset: Offset(0, 5)),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           color: Colors.white,
-          padding: const EdgeInsets.all(15.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
-              children: List.generate(statementItems.length, (index) {
-            final item = statementItems[index];
-            final isDeposit = item['deposit'] != "0.00 บาท";
-            return Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      item['detail'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      item['date'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10.0),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      '',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                    // Text(
-                    //   item['withdraw'] ?? '',
-                    //   style: const TextStyle(
-                    //     color: Color.fromARGB(255, 0, 87, 31),
-                    //     fontSize: 20,
-                    //     fontWeight: FontWeight.bold,
-                    //   ),
-                    // ),
-                    Text(
-                      isDeposit
-                          ? item['deposit'] ?? ''
-                          : item['withdraw'] ??
-                              '', // แสดงจำนวนเงินฝากหรือถอนตามเงื่อนไข
-                      style: TextStyle(
-                        color: isDeposit
-                            ? Constants.primaryColor
-                            : Constants.redColor, // สีต่างกันสำหรับการฝากและถอน
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10.0),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isDeposit ? 'บัญชีต้นทาง' : 'บัญชีปลายทาง',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                    Text(
-                      item['detail1'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10.0),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'หมายเหตุ',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                    Text(
-                      item['detail2'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-                // const SizedBox(height: 10.0),
-                // Row(
-                //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                //   children: [
-                //     const Text(
-                //       'เลขที่ใบเสร็จ',
-                //       style: TextStyle(
-                //         fontSize: 16,
-                //         fontWeight: FontWeight.normal,
-                //       ),
-                //     ),
-                //     Text(
-                //       item['receipt_no'] ?? '',
-                //       style: const TextStyle(
-                //         fontSize: 16,
-                //         fontWeight: FontWeight.normal,
-                //       ),
-                //     ),
-                //   ],
-                // ),
-                // ตรวจสอบว่าเป็นข้อมูลสุดท้ายหรือไม่
-                if (index < statementItems.length - 1) const Divider(),
-              ],
-            );
-          })),
+            children: List.generate(statementItems.length, (index) {
+              return DepositStatementItemTile(
+                item: statementItems[index],
+                isLast: index == statementItems.length - 1,
+              );
+            }),
+          ),
         ),
       ),
     );
   }
 }
+
+class DepositStatementItemTile extends StatefulWidget {
+  final Map<String, dynamic> item;
+  final bool isLast;
+
+  const DepositStatementItemTile({
+    Key? key,
+    required this.item,
+    this.isLast = false,
+  }) : super(key: key);
+
+  @override
+  State<DepositStatementItemTile> createState() =>
+      _DepositStatementItemTileState();
+}
+
+class _DepositStatementItemTileState extends State<DepositStatementItemTile> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final isDeposit = item['deposit'] != null &&
+        item['deposit'] != "0.00 บาท" &&
+        item['deposit'] != "0.00" &&
+        item['deposit'] != "0";
+    final String amountText = isDeposit
+        ? (item['deposit'] ?? '')
+        : (item['withdraw'] ?? '');
+
+    final bool hasDetail1 =
+        item['detail1'] != null && item['detail1'].toString().trim().isNotEmpty;
+    final bool hasDetail2 =
+        item['detail2'] != null && item['detail2'].toString().trim().isNotEmpty;
+    final bool hasExtraDetails = hasDetail1 || hasDetail2;
+
+    return Column(
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: hasExtraDetails
+              ? () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Main Info: Detail & Date (Allows multi-line wrapping on overflow)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['detail'] ?? '',
+                        softWrap: true,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4.0),
+                      Text(
+                        item['date'] ?? '',
+                        softWrap: true,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12.0),
+
+                // Amount & Arrow Toggle Button
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      amountText,
+                      softWrap: true,
+                      style: TextStyle(
+                        color: isDeposit
+                            ? Constants.greenColors
+                            : Constants.redColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (hasExtraDetails) ...[
+                      const SizedBox(width: 4.0),
+                      Icon(
+                        _isExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        size: 20,
+                        color: Colors.grey.shade600,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Expanded Details Section (Hidden by default, wraps multiline text)
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+            padding: const EdgeInsets.all(12.0),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.grey.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Column(
+              children: [
+                if (hasDetail1)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        isDeposit ? 'บัญชีต้นทาง' : 'บัญชีปลายทาง',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          item['detail1'] ?? '',
+                          textAlign: TextAlign.right,
+                          softWrap: true,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (hasDetail1 && hasDetail2) const SizedBox(height: 8.0),
+                if (hasDetail2)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'หมายเหตุ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          item['detail2'] ?? '',
+                          textAlign: TextAlign.right,
+                          softWrap: true,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          crossFadeState: _isExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+        ),
+
+        if (!widget.isLast)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6.0),
+            child: Divider(
+              color: Colors.grey.withValues(alpha: 0.15),
+              height: 1,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+
+

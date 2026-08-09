@@ -31,10 +31,22 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     screens = [
-      HomePage(member_no: widget.member_no, br_no: widget.br_no, token: widget.token),
+      HomePage(
+        member_no: widget.member_no,
+        br_no: widget.br_no,
+        token: widget.token,
+        onTabSelected: (index) {
+          setState(() {
+            _bottomNavIndex = index;
+          });
+        },
+      ),
       AccPage(member_no: widget.member_no, br_no: widget.br_no),
       const ReceiptPage(),
-      SettingPage(member_no: widget.member_no, br_no: widget.br_no, token: widget.token),
+      SettingPage(
+          member_no: widget.member_no,
+          br_no: widget.br_no,
+          token: widget.token),
     ];
   }
 

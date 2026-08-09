@@ -14,12 +14,14 @@ class HomePage extends StatefulWidget {
   final String member_no;
   final String br_no;
   final String token;
+  final ValueChanged<int>? onTabSelected;
 
   const HomePage(
       {super.key,
       required this.member_no,
       required this.br_no,
-      required this.token});
+      required this.token,
+      this.onTabSelected});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -138,16 +140,19 @@ class _HomePageState extends State<HomePage> {
             w: w, // ใส่ค่า w เพื่อป้องกัน Error และรองรับ Responsive
             h: h, // ใส่ค่า h เพื่อป้องกัน Error และรองรับ Responsive
             onCardTap: () {
-              // 🚀 เมื่อกดที่การ์ด หรือ ไอคอนลูกศร ให้เปิดหน้า AccPage
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AccPage(
-                    member_no: _memberNo,
-                    br_no: _branchNo,
+              if (widget.onTabSelected != null) {
+                widget.onTabSelected!(1);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AccPage(
+                      member_no: _memberNo,
+                      br_no: _branchNo,
+                    ),
                   ),
-                ),
-              );
+                );
+              }
             },
           ),
         ),
@@ -386,14 +391,18 @@ class _HomePageState extends State<HomePage> {
   Widget _buildMenuButton(String imagePath, String title, Widget nextPage) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => nextPage,
-            settings: RouteSettings(
-                arguments: {'member_no': _memberNo, 'br_no': _branchNo}),
-          ),
-        );
+        if (title == 'เงินฝาก' && widget.onTabSelected != null) {
+          widget.onTabSelected!(1);
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => nextPage,
+              settings: RouteSettings(
+                  arguments: {'member_no': _memberNo, 'br_no': _branchNo}),
+            ),
+          );
+        }
       },
       child: Container(
         decoration: BoxDecoration(

@@ -3,12 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:koperasiapp/constants.dart';
 import 'package:koperasiapp/screen/depositStatement_page.dart';
-import 'package:page_transition/page_transition.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'qrcode_page.dart';
-import 'register_terms_page.dart';
+import 'package:intl/intl.dart';
 
 class AccPage extends StatefulWidget {
   final String member_no;
@@ -29,7 +26,6 @@ class _AccPageState extends State<AccPage> {
   String memberName = "Loading...";
 
   List<dynamic> _accounts = [];
-  String _totalBalance = '';
 
   Future<void> fetchAccountData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -54,7 +50,6 @@ class _AccPageState extends State<AccPage> {
       final Map<String, dynamic> jsonResponse = json.decode(response.body);
       setState(() {
         _accounts = jsonResponse['data']; // เก็บข้อมูล accounts
-        _totalBalance = jsonResponse['total_balance']; // เก็บยอดรวม
       });
     } else {
       throw Exception('Failed to load data');
@@ -71,251 +66,232 @@ class _AccPageState extends State<AccPage> {
 
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
     final theme = Theme.of(context);
-    final w = media.size.width;
-    final h = media.size.height;
-    final _formSignInKey = GlobalKey<FormState>();
-    final _navigatorKey = GlobalKey<NavigatorState>();
     return Scaffold(
-      // navigatorKey: _navigatorKey, // This is where the navigatorKey should go
-        backgroundColor: Constants.bg,
-        appBar: AppBar(
-          backgroundColor: Constants.primaryColor,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          centerTitle: true, // ✅ ตัวนี้ทำให้ title อยู่กลางจริง
-          title: Text(
-            'บัญชีออมทรัพย์',
-            style: theme.textTheme.titleLarge!.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Constants.greenColors,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        centerTitle: true,
+        title: Text(
+          'บัญชีออมทรัพย์',
+          style: theme.textTheme.titleLarge!.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        body: _accounts.isEmpty
-            ? const Center(
-                child:
-                    CircularProgressIndicator()) // ถ้ายังไม่มีข้อมูลให้แสดง loading
-            : Padding(
-                padding: EdgeInsets.all(20.0),
-                child: Column(
-                  children: [
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.stop,
-                          color: Color.fromARGB(255, 0, 87, 31),
-                          size: 30.0,
+      ),
+      body: _accounts.isEmpty
+          ? Center(
+              child: CircularProgressIndicator(
+                color: Constants.greenColors,
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.stop,
+                        color: Constants.greenColors,
+                        size: 24.0,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'บัญชีของฉัน',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
-                        Text(
-                          'บัญชีของฉัน',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(
-                      height: 20.0,
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _accounts.length,
-                        itemBuilder: (context, index) {
-                          final account =
-                              _accounts[index]; // ข้อมูลบัญชีแต่ละรายการ
-
-                          return Column(
-                            children: [
-                              InkWell(
-                                onTap: () {
-                                  // เมื่อกด AccCard จะเปลี่ยนหน้าไปยังหน้าถัดไป
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          DepositStatementPage(
-                                        accountNo: account['account_no'],
-                                        memberNo: _memberNo,
-                                        branchNo: _branchNo,
-                                        token: _token,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: AccCard(
-                                  text1: 'บัญชี${account['account_desc']}',
-                                  text2: account['account_name'],
-                                  text3: account['balance'],
-                                  text4: account['account_no'],
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    itemCount: _accounts.length,
+                    itemBuilder: (context, index) {
+                      final account = _accounts[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => DepositStatementPage(
+                                  accountNo: account['account_no'] ?? '',
+                                  memberNo: _memberNo,
+                                  branchNo: _branchNo,
+                                  token: _token,
                                 ),
                               ),
-                              const SizedBox(height: 20),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                            );
+                          },
+                          child: AccCard(
+                            text1: account['account_desc'] ?? '',
+                            text2: account['account_name'] ?? '',
+                            text3: (account['balance'] ?? '0').toString(),
+                            text4: account['account_no'] ?? '',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
+              ],
+            ),
     );
   }
 }
 
 // ACC CARD STYLE
 class AccCard extends StatelessWidget {
-  final String text1;
-  final String text2;
-  final String text3;
-  final String text4;
+  final String text1; // account_desc
+  final String text2; // account_name
+  final String text3; // balance
+  final String text4; // account_no
 
-  const AccCard(
-      {Key? key,
-      required this.text1,
-      required this.text2,
-      required this.text3,
-      required this.text4})
-      : super(key: key);
+  const AccCard({
+    Key? key,
+    required this.text1,
+    required this.text2,
+    required this.text3,
+    required this.text4,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    var mediaSize = MediaQuery.of(context).size;
+    final formatter = NumberFormat('#,##0.00');
+    final double? parsedVal = double.tryParse(text3.replaceAll(',', ''));
+    final String formattedBalance =
+        parsedVal != null ? formatter.format(parsedVal) : text3;
+    final String cleanDesc = text1.replaceAll('บัญชี', '').trim();
+
     return Container(
-        height: mediaSize.height * 0.22,
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [
-              BoxShadow(
-                  color: Color(0xFFe8e8e8),
-                  blurRadius: 10.0,
-                  offset: Offset(0, 5))
-            ]),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Column(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.15),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Row 1: Account Name
+          Text(
+            text2,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12.0),
+
+          // Row 2: Account Number & Tag Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                  flex: 2,
-                  child: Container(
-                    color: Colors.white,
-                    child: Stack(
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: Padding(
-                            padding: EdgeInsets.all(15.0),
-                            child: Column(
-                              // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      text1,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'ยอดเงินคงเหลือ',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.normal,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(
-                                  height: 10.0,
-                                ),
-                                Divider(),
-                                const SizedBox(
-                                  height: 10.0,
-                                ),
-                                Column(
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          text2,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              text3,
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(
-                                      height: 10.0,
-                                    ),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          text4,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.normal,
-                                          ),
-                                        ),
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          children: [
-                                            Positioned(
-                                              // top: 50,
-                                              // left: 10,
-                                              child: Image.asset(
-                                                'assets/images/credit-card.png',
-                                                height: 40,
-                                                fit: BoxFit.cover,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    )
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+              Text(
+                text4,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              if (cleanDesc.isNotEmpty)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Constants.greenColors.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    cleanDesc,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Constants.greenColors,
                     ),
-                  )),
+                  ),
+                ),
             ],
           ),
-        ));
+          const SizedBox(height: 14.0),
+
+          // Divider Line
+          Divider(
+            color: Colors.grey.withValues(alpha: 0.15),
+            height: 1,
+          ),
+          const SizedBox(height: 12.0),
+
+          // Row 3: Withdrawable Balance Label & Amount
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                'ยอดเงินที่ถอนได้',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    formattedBalance,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Constants.greenColors,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'บาท',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
+
+

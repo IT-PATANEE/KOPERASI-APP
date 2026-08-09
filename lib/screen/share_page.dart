@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:koperasiapp/constants.dart';
+import 'package:koperasiapp/screen/selecttransfer_page.dart';
+import 'package:koperasiapp/screen/selectqrcode_page.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class SharePage extends StatefulWidget {
   final String member_no;
@@ -23,12 +26,11 @@ class _SharePageState extends State<SharePage> {
 
   Future<void> fetchShareData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token =
-        prefs.getString('token'); // Get the token from SharedPreferences
+    String? token = prefs.getString('token');
 
     if (token != null && token.isNotEmpty) {
       setState(() {
-        _token = token; // Store token in a variable
+        _token = token;
       });
     }
 
@@ -39,24 +41,19 @@ class _SharePageState extends State<SharePage> {
       final response = await http.get(
         Uri.parse(fullUrl),
         headers: {
-          'Authorization': 'Bearer $token', // Send token in headers
+          'Authorization': 'Bearer $token',
         },
       );
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = json.decode(response.body);
 
-        // ตรวจสอบว่าข้อมูลใน jsonResponse เป็นไปตามที่คาดหวัง
         if (jsonResponse['success'] == 1) {
-          // หรือค่าที่เหมาะสมที่แสดงความสำเร็จ
           setState(() {
-            _shareData = jsonResponse['data']; // เก็บทั้ง master และ statement
-            // print(
-            //     'Share Data: $_shareData');
+            _shareData = jsonResponse['data'];
           });
         } else {
-          print(
-              'Error: ${jsonResponse['message']}'); // ถ้ามีข้อความผิดพลาดใน JSON
+          print('Error: ${jsonResponse['message']}');
         }
       } else {
         throw Exception('Failed to load data');
@@ -76,164 +73,175 @@ class _SharePageState extends State<SharePage> {
 
   @override
   Widget build(BuildContext context) {
-     final theme = Theme.of(context); // <-- ใช้ ThemeData
-    return MaterialApp(
-      home: Scaffold(
-        backgroundColor: Constants.bg,
-        appBar: AppBar(
-          backgroundColor: Constants.primaryColor,
-          title: const Center(
-            child: Text(
-              'ทุนเรือนหุ้น',
-              style:
-                  TextStyle(fontWeight: FontWeight.w500, color: Colors.white),
-            ),
-          ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+    final theme = Theme.of(context);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Constants.greenColors,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        centerTitle: true,
+        title: Text(
+          'ทุนเรือนหุ้น',
+          style: theme.textTheme.titleLarge!.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        body: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              children: [
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.stop,
-                      color: Color.fromARGB(255, 0, 87, 31),
-                      size: 30.0,
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.stop,
+                    color: Constants.greenColors,
+                    size: 24.0,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'หุ้นสมาชิก',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
-                    Text(
-                      'หุ้นสมาชิก',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15.0),
+              _shareData == null
+                  ? Center(
+                      child: CircularProgressIndicator(
+                        color: Constants.greenColors,
                       ),
+                    )
+                  : (_shareData!['master'] != null &&
+                          _shareData!['master'].isNotEmpty
+                      ? ShareCard(
+                          text1: _shareData!['master']['share_accu'] ?? '',
+                          text2: _shareData!['master']['share_sum_qty'] ?? '',
+                          text3: _shareData!['master']['share_amount'] ?? '',
+                        )
+                      : const Text('ไม่พบข้อมูลหุ้น')),
+              const SizedBox(height: 20.0),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  BuildMenuButton(
+                    imagePath: 'assets/images/icon-menu/icon_01.png',
+                    title: 'โอน-ชำระ',
+                    nextPage: SelectTransferPage(
+                      member_no: _memberNo,
+                      br_no: _branchNo,
+                      token: _token,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 20.0),
-                // Check if _shareData is available before rendering ShareCard
-                _shareData == null
-                    ? const CircularProgressIndicator()
-                    : (_shareData!['master'] != null &&
-                            _shareData!['master'].isNotEmpty
-                        ? ShareCard(
-                            text1: _shareData!['master']['share_accu'] ?? '',
-                            text2: _shareData!['master']['share_sum_qty'] ?? '',
-                            text3: _shareData!['master']['share_amount'] ?? '',
-                          )
-                        : const Text('No master data available')),
-                const SizedBox(height: 20.0),
-                Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        BuildMenuButton(
-                          imagePath: 'assets/images/icon-menu/share_pay.png',
-                          title: 'ชำระค่าหุ้น',
-                          nextPage: const SharePage(
-                            member_no: '',
-                            br_no: '',
-                          ),
-                          memberNo: _memberNo,
-                          branchNo: _branchNo,
-                        ),
-                        BuildMenuButton(
-                          imagePath: 'assets/images/icon-menu/cal.png',
-                          title: 'คำนวณสินเชื่อ',
-                          nextPage: const SharePage(
-                            member_no: '',
-                            br_no: '',
-                          ),
-                          memberNo: _memberNo,
-                          branchNo: _branchNo,
-                        ),
-                        BuildMenuButton(
-                          imagePath: 'assets/images/icon-menu/recipt.png',
-                          title: 'ใบเสร็จ',
-                          nextPage: const SharePage(
-                            member_no: '',
-                            br_no: '',
-                          ),
-                          memberNo: _memberNo,
-                          branchNo: _branchNo,
-                        ),
-                      ],
+                    memberNo: _memberNo,
+                    branchNo: _branchNo,
+                  ),
+                  BuildMenuButton(
+                    imagePath: 'assets/images/icon-menu/icon_09.png',
+                    title: 'โอนเงินไปยังธนาคาร',
+                    nextPage: SharePage(
+                      member_no: _memberNo,
+                      br_no: _branchNo,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 20.0),
-                Column(
-                  children: [
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'รายการย้อนหลัง',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.normal,
-                          ),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.filter_list_outlined,
-                              color: Color.fromARGB(255, 0, 0, 0),
-                              size: 20.0,
-                            ),
-                            Text(
-                              'ตัวกรอง',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.normal,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    memberNo: _memberNo,
+                    branchNo: _branchNo,
+                  ),
+                  BuildMenuButton(
+                    imagePath: 'assets/images/icon-menu/icon_06.png',
+                    title: 'QR Code',
+                    nextPage: SelectQrcodePage(
+                      member_no: _memberNo,
+                      br_no: _branchNo,
                     ),
-                    const SizedBox(height: 20.0),
-                    // Check if statement data is available
-                    if (_shareData != null &&
-                        _shareData!['statement'] is List &&
-                        _shareData!['statement'].isNotEmpty) ...[
-                      // Convert the statement data to the correct format
-                      ShareStatementCard(
-                        statementItems: List<Map<String, dynamic>>.from(
-                            _shareData!['statement'].map((item) => Map<String,
-                                    dynamic>.from(
-                                item))), //แปลงข้อมูลที่ได้รับจาก _shareData ให้อยู่ในรูปแบบที่สามารถใช้งานได้ใน ShareStatementCard
+                    memberNo: _memberNo,
+                    branchNo: _branchNo,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 25.0),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'รายการย้อนหลัง',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
-                    ] else ...[
-                      const Text('ไม่พบข้อมูล'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.filter_list_outlined,
+                            color: Colors.grey.shade700,
+                            size: 20.0,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'ตัวกรอง',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
-                    const SizedBox(height: 10.0),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'สิ้นสุดรายการทั้งหมด',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.normal,
-                          ),
+                  ),
+                  const SizedBox(height: 15.0),
+                  if (_shareData != null &&
+                      _shareData!['statement'] is List &&
+                      _shareData!['statement'].isNotEmpty) ...[
+                    ShareStatementCard(
+                      statementItems: List<Map<String, dynamic>>.from(
+                        _shareData!['statement'].map(
+                          (item) => Map<String, dynamic>.from(item),
                         ),
-                      ],
+                      ),
+                    ),
+                  ] else ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20.0),
+                      child: Center(
+                        child: Text(
+                          'ไม่พบข้อมูลรายการย้อนหลัง',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
                     ),
                   ],
-                ),
-              ],
-            ),
+                  const SizedBox(height: 20.0),
+                  Center(
+                    child: Text(
+                      'สิ้นสุดรายการทั้งหมด',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -259,8 +267,6 @@ class BuildMenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var mediaSize = MediaQuery.of(context).size;
-
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -275,17 +281,38 @@ class BuildMenuButton extends StatelessWidget {
       },
       child: Column(
         children: [
-          Image.asset(
-            imagePath,
-            height: mediaSize.height * 0.1,
-            fit: BoxFit.cover,
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Image.asset(
+              imagePath,
+              height: 38,
+              width: 38,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.widgets_outlined,
+                color: Constants.greenColors,
+                size: 28,
+              ),
+            ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 8),
           Text(
             title,
             style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.normal,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
             ),
           ),
         ],
@@ -296,10 +323,9 @@ class BuildMenuButton extends StatelessWidget {
 
 // ShareCard STYLE
 class ShareCard extends StatelessWidget {
-  final String text1;
-  final String text2;
-  final String text3;
-  // final String text4;
+  final String text1; // share_accu
+  final String text2; // share_sum_qty
+  final String text3; // share_amount
 
   const ShareCard({
     Key? key,
@@ -310,138 +336,135 @@ class ShareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var mediaSize = MediaQuery.of(context).size;
+    final formatter = NumberFormat('#,##0.00');
+    final double? parsedVal = double.tryParse(text1.replaceAll(',', ''));
+    final String formattedAccu =
+        parsedVal != null ? formatter.format(parsedVal) : text1;
+
     return Container(
-        height: mediaSize.height * 0.22,
-        decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [
-              BoxShadow(
-                  color: Color(0xFFe8e8e8),
-                  blurRadius: 10.0,
-                  offset: Offset(0, 5))
-            ]),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Column(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.15),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Row 1: Accumulated Share
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Expanded(
-                  flex: 2,
-                  child: Container(
-                    color: Colors.white,
-                    child: Stack(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(15.0),
-                          child: Column(
-                            // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'หุ้นสะสม',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        text1,
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(
-                                height: 10.0,
-                              ),
-                              const Divider(),
-                              const SizedBox(
-                                height: 10.0,
-                              ),
-                              Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'จำนวนหุ้นคงเหลือ',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.normal,
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            text2,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.normal,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(
-                                    height: 10.0,
-                                  ),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'หุ้นรายเดือน',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.normal,
-                                        ),
-                                      ),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            text3,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.normal,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  )
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+              const Text(
+                'หุ้นสะสม',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    formattedAccu,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Constants.greenColors,
                     ),
-                  )),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'บาท',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-        ));
+          const SizedBox(height: 14.0),
+
+          // Divider Line
+          Divider(
+            color: Colors.grey.withValues(alpha: 0.15),
+            height: 1,
+          ),
+          const SizedBox(height: 12.0),
+
+          // Row 2: Remaining Share Count
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'จำนวนหุ้นคงเหลือ',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Text(
+                text2,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10.0),
+
+          // Row 3: Monthly Share Amount
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'หุ้นรายเดือน',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              Text(
+                text3,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
 // ShareStatementCard STYLE
 class ShareStatementCard extends StatelessWidget {
-  final List<Map<String, dynamic>> statementItems; // รับรายการ statement
+  final List<Map<String, dynamic>> statementItems;
 
   const ShareStatementCard({
     Key? key,
@@ -451,126 +474,264 @@ class ShareStatementCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.15),
+          width: 1.0,
+        ),
+        boxShadow: [
           BoxShadow(
-              color: Color(0xFFe8e8e8), blurRadius: 10.0, offset: Offset(0, 5)),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
           color: Colors.white,
-          padding: const EdgeInsets.all(15.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
-              children: List.generate(statementItems.length, (index) {
-            final item = statementItems[index];
-            return Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'ฝากหุ้น',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '${item['share_date'] ?? ''}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10.0),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('', style: TextStyle(fontSize: 16)),
-                    Text(
-                      item['share_amount'] ?? '',
-                      style: const TextStyle(
-                        color: Color.fromARGB(255, 0, 87, 31),
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10.0),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'จำนวนงวด',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                    Text(
-                      item['share_period']?.toString() ?? '',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10.0),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'หุ้นสะสม',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                    Text(
-                      item['share_accu'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10.0),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'เลขที่ใบเสร็จ',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                    Text(
-                      item['receipt_no'] ?? '',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10.0),
-                // ตรวจสอบว่าเป็นข้อมูลสุดท้ายหรือไม่
-                if (index < statementItems.length - 1) const Divider(),
-              ],
-            );
-          })),
+            children: List.generate(statementItems.length, (index) {
+              return ShareStatementItemTile(
+                item: statementItems[index],
+                isLast: index == statementItems.length - 1,
+              );
+            }),
+          ),
         ),
       ),
     );
   }
 }
+
+class ShareStatementItemTile extends StatefulWidget {
+  final Map<String, dynamic> item;
+  final bool isLast;
+
+  const ShareStatementItemTile({
+    Key? key,
+    required this.item,
+    this.isLast = false,
+  }) : super(key: key);
+
+  @override
+  State<ShareStatementItemTile> createState() => _ShareStatementItemTileState();
+}
+
+class _ShareStatementItemTileState extends State<ShareStatementItemTile> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final String amountText = (item['share_amount'] ?? '').toString();
+    final String dateText = (item['share_date'] ?? '').toString();
+    final String periodText = (item['share_period'] ?? '').toString();
+    final String accuText = (item['share_accu'] ?? '').toString();
+    final String receiptText = (item['receipt_no'] ?? '').toString();
+
+    final bool hasPeriod = periodText.trim().isNotEmpty;
+    final bool hasAccu = accuText.trim().isNotEmpty;
+    final bool hasReceipt = receiptText.trim().isNotEmpty;
+    final bool hasExtraDetails = hasPeriod || hasAccu || hasReceipt;
+
+    return Column(
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: hasExtraDetails
+              ? () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title & Date
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'ฝากหุ้น',
+                        softWrap: true,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4.0),
+                      Text(
+                        dateText,
+                        softWrap: true,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12.0),
+
+                // Amount & Arrow Toggle Icon
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      amountText,
+                      softWrap: true,
+                      style: TextStyle(
+                        color: Constants.greenColors,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (hasExtraDetails) ...[
+                      const SizedBox(width: 4.0),
+                      Icon(
+                        _isExpanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        size: 20,
+                        color: Colors.grey.shade600,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Expanded Details Section
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+            padding: const EdgeInsets.all(12.0),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.grey.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Column(
+              children: [
+                if (hasPeriod)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'จำนวนงวด',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          periodText,
+                          textAlign: TextAlign.right,
+                          softWrap: true,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (hasPeriod && (hasAccu || hasReceipt))
+                  const SizedBox(height: 8.0),
+                if (hasAccu)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'หุ้นสะสม',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          accuText,
+                          textAlign: TextAlign.right,
+                          softWrap: true,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (hasAccu && hasReceipt) const SizedBox(height: 8.0),
+                if (hasReceipt)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'เลขที่ใบเสร็จ',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          receiptText,
+                          textAlign: TextAlign.right,
+                          softWrap: true,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          crossFadeState: _isExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+        ),
+
+        if (!widget.isLast)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6.0),
+            child: Divider(
+              color: Colors.grey.withValues(alpha: 0.15),
+              height: 1,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
