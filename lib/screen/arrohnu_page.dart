@@ -94,7 +94,7 @@ class _ArrohnuPageState extends State<ArrohnuPage> {
         ),
         centerTitle: true,
         title: Text(
-          'สินเชื่ออัร-เราะห์นู',
+          'สินเชื่ออัรเราะห์นู',
           style: theme.textTheme.titleLarge!.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -110,7 +110,7 @@ class _ArrohnuPageState extends State<ArrohnuPage> {
           : _arrohnus.isEmpty
               ? const Center(
                   child: Text(
-                    'ไม่พบข้อมูลสินเชื่ออัร-เราะห์นู',
+                    'ไม่พบข้อมูลสินเชื่ออัรเราะห์นู',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
