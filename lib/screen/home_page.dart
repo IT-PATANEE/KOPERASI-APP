@@ -9,6 +9,7 @@ import 'package:koperasiapp/screen/loan_page.dart';
 import 'package:koperasiapp/screen/share_page.dart';
 import 'package:koperasiapp/screen/taawoon_page.dart';
 import 'package:koperasiapp/screen/selecttransfer_page.dart';
+import 'package:koperasiapp/screen/welfare_page.dart';
 
 class HomePage extends StatefulWidget {
   final String member_no;
@@ -336,7 +337,8 @@ class _HomePageState extends State<HomePage> {
       {
         'icon': 'assets/images/icon-menu/icon_04.png',
         'title': 'สวัสดิการ',
-        'page': SharePage(member_no: _memberNo, br_no: _branchNo)
+        'page': WelfarePage(
+            member_no: _memberNo, br_no: _branchNo, token: _token)
       },
       {
         'icon': 'assets/images/icon-menu/icon_05.png',

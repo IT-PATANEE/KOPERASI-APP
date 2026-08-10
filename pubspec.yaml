@@ -52,6 +52,7 @@ dependencies:
   permission_handler: ^11.3.0
   share_plus: ^7.2.1
   flutter_launcher_icons: ^0.14.4
+  url_launcher: ^6.2.5
   # ----- end add 210468 -----
 
   # ----- anita add 140868  -----
