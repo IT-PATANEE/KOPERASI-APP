@@ -9,8 +9,7 @@ import 'package:koperasiapp/constants.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
 
 class LoadQrcodePage extends StatefulWidget {
   final String memberNo;
@@ -173,7 +172,7 @@ class _LoadQrcodePageState extends State<LoadQrcodePage> {
       await file.writeAsBytes(pngBytes);
 
       if (!mounted) return;
-      const snackBar = SnackBar(content: Text('QR code saved to gallery'));
+      const snackBar = SnackBar(content: Text('บันทึก QR Code ลงเครื่องสำเร็จ'));
       ScaffoldMessenger.of(context).showSnackBar(snackBar);
     } catch (e) {
       print('Save image error: $e');
@@ -187,149 +186,352 @@ class _LoadQrcodePageState extends State<LoadQrcodePage> {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final isPortrait = media.orientation == Orientation.portrait;
-    final theme = Theme.of(context); // <-- ใช้ ThemeData
     final w = media.size.width;
     final h = media.size.height;
-    final textScale = w * 0.04; // ขนาดฟอนต์ตามความกว้างจอ
+    final currencyFormatter = NumberFormat('#,##0.00');
 
     return Scaffold(
-      backgroundColor: Constants.bg,
+      backgroundColor: const Color(0xFFF4F6F5),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        centerTitle: true,
+        title: Text(
+          "รับเงินด้วย QR CODE",
+          style: TextStyle(
+            color: Constants.greenColors,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, color: Constants.greenColors, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.close, color: Constants.greenColors),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Column(
-              children: [
-                // 🔹 หัวบน
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: w * 0.04, vertical: h * 0.015),
-                  child: SizedBox(
-                    height: 40, // กำหนดความสูง header
-                    child: Stack(
-                      alignment: Alignment.center,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(
+                    horizontal: w * 0.04, vertical: h * 0.015),
+                child: RepaintBoundary(
+                  key: _repaintKey,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Constants.greenColors.withValues(alpha: 0.18),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Center(
-                          child: Text(
-                            "รับเงินด้วย QR CODE",
-                            style: theme.textTheme.titleLarge!.copyWith(
-                              color: Colors.green[900],
-                              fontWeight: FontWeight.bold,
+                        // Header Banner
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 14, horizontal: 16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Constants.greenColors,
+                                Colors.green.shade800,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(18),
+                              topRight: Radius.circular(18),
                             ),
                           ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.qr_code_2_rounded,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _getTitleByType(widget.type),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        Positioned(
-                          right: 0,
-                          child: IconButton(
-                            icon: Icon(Icons.close, color: Colors.green[900]),
-                            onPressed: () => Navigator.pop(context),
+
+                        // Amount Card (If amount > 0)
+                        if (widget.amount > 0) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Constants.greenColors
+                                  .withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: Constants.greenColors
+                                    .withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  "จำนวนเงินชำระ",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Text(
+                                      currencyFormatter.format(widget.amount),
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Constants.greenColors,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "บาท",
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // QR Code View Container
+                        Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: _isLoading
+                              ? Container(
+                                  height: isPortrait ? w * 0.5 : h * 0.4,
+                                  width: isPortrait ? w * 0.5 : h * 0.4,
+                                  alignment: Alignment.center,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      CircularProgressIndicator(
+                                        color: Constants.greenColors,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        "กำลังสร้าง QR Code...",
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Colors.grey.withValues(alpha: 0.15),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.03),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      QrImageView(
+                                        data: _qrCodeContent,
+                                        size: isPortrait ? w * 0.52 : h * 0.42,
+                                        backgroundColor: Colors.white,
+                                        errorCorrectionLevel:
+                                            QrErrorCorrectLevel.H,
+                                      ),
+                                      Container(
+                                        width: w * 0.11,
+                                        height: w * 0.11,
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.12),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          child: Image.asset(
+                                            'assets/images/logo_new.png',
+                                            fit: BoxFit.contain,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                        ),
+
+                        // Subtitle Instruction
+                        Text(
+                          "สแกนเพื่อชำระเงินผ่าน Mobile Banking",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "สามารถบันทึก QR Code นี้เพื่อใช้ทำธุรกรรมในครั้งต่อไป",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Divider(
+                            color: Colors.grey.withValues(alpha: 0.15),
+                            height: 1,
+                          ),
+                        ),
+
+                        // Account Details Container
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: widget.selectedType == 1
+                              ? _buildMyAccountDetails()
+                              : _buildOtherAccountDetails(),
+                        ),
+
+                        // Note text
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 14,
+                                color: Colors.grey.shade500,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  "สามารถบันทึก QR Code นี้เพื่อใช้ทำธุรกรรมในครั้งต่อไป",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
+              ),
+            ),
 
-                RepaintBoundary(
-                  key: _repaintKey,
-                  child: Expanded(
-                    child: SingleChildScrollView(
-                      child: Container(
-                        margin: EdgeInsets.symmetric(horizontal: w * 0.04),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green, width: 1),
-                        ),
-                        child: Column(
-                          children: [
-                            // 🔹 หัวข้อสีเขียว
-                            Container(
-                              width: double.infinity,
-                              padding: EdgeInsets.all(h * 0.015),
-                              decoration: BoxDecoration(
-                                color: Colors.green[700],
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(12),
-                                  topRight: Radius.circular(12),
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  _getTitleByType(widget.type),
-                                  // _getTitleBySelectedType(widget.selectedType),
-                                  style: theme.textTheme.titleLarge!.copyWith(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // 🔹 QR Code
-                            Padding(
-                              padding: EdgeInsets.all(h * 0.025),
-                              child: QrImageView(
-                                data: _qrCodeContent,
-                                size: isPortrait ? w * 0.5 : h * 0.4,
-                                backgroundColor: Colors.white,
-                                embeddedImage: const AssetImage(
-                                    'assets/images/logo_new.png'),
-                                embeddedImageStyle: QrEmbeddedImageStyle(
-                                  size: Size(w * 0.08, w * 0.08),
-                                ),
-                              ),
-                            ),
-
-                            Text(
-                              "QR ของคุณได้ถูกสร้างแล้ว\nผู้จ่ายสามารถสแกนเพื่อชำระเงินได้",
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium,
-                            ),
-
-                            const Divider(),
-
-                            // ข้อมูลบัญชี
-                            // แสดงรายละเอียดบัญชี ตาม selectedType
-                            if (widget.selectedType == 1)
-                              _buildMyAccountDetails()
-                            else if (widget.selectedType == 2)
-                              _buildOtherAccountDetails(),
-
-                            SizedBox(height: h * 0.01),
-
-                            Text(
-                              "สมาชิกสามารถบันทึก QR CODE นี้\nเพื่อใช้ในการทำธุรกรรมในครั้งต่อไป",
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall!.copyWith(
-                                color: Colors.grey[700],
-                              ),
-                            ),
-
-                            SizedBox(height: h * 0.02),
-                          ],
-                        ),
-                      ),
+            // Save Action Button
+            Padding(
+              padding: EdgeInsets.symmetric(
+                  horizontal: w * 0.04, vertical: h * 0.015),
+              child: Container(
+                width: double.infinity,
+                height: 52,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Constants.greenColors.withValues(alpha: 0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: _saveAsImage,
+                  icon: const Icon(Icons.file_download_outlined,
+                      size: 22, color: Colors.white),
+                  label: const Text(
+                    'บันทึก QR CODE ลงเครื่อง',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Constants.greenColors,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                 ),
-
-                Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: w * 0.04, vertical: h * 0.015),
-                  child: ElevatedButton.icon(
-                    onPressed: _saveAsImage,
-                    icon: const Icon(Icons.download),
-                    label: const Text('บันทึก QR'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Constants.greenColor,
-                      foregroundColor: Colors.white,
-                      textStyle: theme.textTheme.labelLarge,
-                      minimumSize: Size(double.infinity, 50),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -337,61 +539,111 @@ class _LoadQrcodePageState extends State<LoadQrcodePage> {
 
 // =================== ฟังก์ชันรายละเอียดบัญชี ===================
   Widget _buildMyAccountDetails() {
-    final theme = Theme.of(context);
-    final w = MediaQuery.of(context).size.width;
-    final h = MediaQuery.of(context).size.height;
+    final String formattedMemberNo = (widget.brNo.isNotEmpty && widget.memberNo.isNotEmpty)
+        ? '${widget.brNo}-01-${widget.memberNo}'
+        : '${widget.brNo}${widget.memberNo}';
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: w * 0.04, vertical: h * 0.015),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBF8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Constants.greenColors.withValues(alpha: 0.15),
+          width: 1.0,
+        ),
+      ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("ชื่อสมาชิก :",
-                  style: theme.textTheme.bodyMedium!
-                      .copyWith(fontWeight: FontWeight.bold)),
-              Text(widget.memberName, style: theme.textTheme.bodyMedium),
+              Text(
+                "ชื่อสมาชิก :",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              Text(
+                widget.memberName.isNotEmpty ? widget.memberName : '-',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
             ],
           ),
-          SizedBox(height: h * 0.008),
+          const SizedBox(height: 8),
           if (widget.type == 1) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("เลขที่สมาชิก :",
-                    style: theme.textTheme.bodyMedium!
-                        .copyWith(fontWeight: FontWeight.bold)),
-                Text("${widget.brNo}${widget.memberNo}",
-                    style: theme.textTheme.bodyMedium),
+                Text(
+                  "เลขที่สมาชิก :",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                Text(
+                  formattedMemberNo,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
               ],
             ),
           ],
           if (widget.type == 2) ...[
-            SizedBox(height: h * 0.008),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   "เลขที่บัญชี :",
-                  style: theme.textTheme.bodyMedium!
-                      .copyWith(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
-                Text(widget.toAccountNo, style: theme.textTheme.bodyMedium),
+                Text(
+                  widget.toAccountNo.isNotEmpty ? widget.toAccountNo : '-',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
               ],
             ),
           ],
           if (widget.type == 3 || widget.type == 4) ...[
-            SizedBox(height: h * 0.008),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   "รหัสบัญชี :",
-                  style: theme.textTheme.bodyMedium!
-                      .copyWith(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
-                Text(widget.toAccountNo, style: theme.textTheme.bodyMedium),
+                Text(
+                  widget.toAccountNo.isNotEmpty ? widget.toAccountNo : '-',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
               ],
             ),
           ],
@@ -401,91 +653,87 @@ class _LoadQrcodePageState extends State<LoadQrcodePage> {
   }
 
   Widget _buildOtherAccountDetails() {
-    final theme = Theme.of(context);
-    final w = MediaQuery.of(context).size.width;
-    final h = MediaQuery.of(context).size.height;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: w * 0.04, vertical: h * 0.015),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBF8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Constants.greenColors.withValues(alpha: 0.15),
+          width: 1.0,
+        ),
+      ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("ชื่อสมาชิก :",
-                  style: theme.textTheme.bodyMedium!
-                      .copyWith(fontWeight: FontWeight.bold)),
-              Text(widget.toMemName, style: theme.textTheme.bodyMedium),
+              Text(
+                "ชื่อสมาชิก :",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              Text(
+                widget.toMemName.isNotEmpty ? widget.toMemName : '-',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
             ],
           ),
-          SizedBox(height: h * 0.008),
-          // type = 1 แสดง "เลขที่สมาชิก"
+          const SizedBox(height: 8),
           if (widget.type == 1) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("เลขที่สมาชิก :",
-                    style: theme.textTheme.bodyMedium!
-                        .copyWith(fontWeight: FontWeight.bold)),
-                Text(widget.toAccountNo, style: theme.textTheme.bodyMedium),
+                Text(
+                  "เลขที่สมาชิก :",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                Text(
+                  widget.toAccountNo.isNotEmpty ? widget.toAccountNo : '-',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
               ],
             ),
           ],
-          // type = 2 แสดง "เลขที่บัญชี"
-          if (widget.type == 2) ...[
+          if (widget.type == 2 || widget.type == 3 || widget.type == 4) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("เลขที่บัญชี :",
-                    style: theme.textTheme.bodyMedium!
-                        .copyWith(fontWeight: FontWeight.bold)),
-                Text(widget.toAccountNo, style: theme.textTheme.bodyMedium),
+                Text(
+                  "เลขที่บัญชี :",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                Text(
+                  widget.toAccountNo.isNotEmpty ? widget.toAccountNo : '-',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
               ],
             ),
           ],
-
-          // type = 3, 4 แสดง "รหัสบัญชี"
-          if (widget.type == 3 || widget.type == 4) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("เลขที่บัญชี :",
-                    style: theme.textTheme.bodyMedium!
-                        .copyWith(fontWeight: FontWeight.bold)),
-                Text(widget.toAccountNo, style: theme.textTheme.bodyMedium),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-  // String _getTitleBySelectedType(int selectedType) {
-  //   if (selectedType == 1) return "บัญชีของตัวเอง";
-  //   if (selectedType == 2) return "บัญชีผู้อื่น";
-  //   return "รายละเอียดบัญชี";
-  // }
-
-// ปุ่มไอคอนแบบ responsive
-  Widget _buildActionButton(
-      IconData icon, String label, VoidCallback onTap, double screenWidth) {
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: EdgeInsets.all(screenWidth * 0.025),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.green),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: Colors.green, size: screenWidth * 0.06),
-          ),
-          SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(
-                  color: Colors.green[900], fontSize: screenWidth * 0.03)),
         ],
       ),
     );

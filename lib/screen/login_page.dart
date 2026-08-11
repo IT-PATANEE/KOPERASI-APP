@@ -211,7 +211,10 @@ class _LoginPageState extends State<LoginPage> {
           final mobile = response['mobile'];
 
           SharedPreferences prefs = await SharedPreferences.getInstance();
-          await prefs.setString('token', response['token']);
+          await prefs.setString('token', response['token'].toString());
+          if (mobile != null) {
+            await prefs.setString('mobile', mobile.toString());
+          }
 
           //--------------- anita add 03082025 ---------------
           if (rememberPassword) {

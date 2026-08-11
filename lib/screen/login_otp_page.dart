@@ -149,7 +149,13 @@ class _LoginOtpPageState extends State<LoginOtpPage> {
         debugPrint("Raw Response: ${response.body}");
 
         if (result['success'] == 1) {
-          // OTP ผ่าน → ไปหน้าตามสถานะ PIN
+          // OTP ผ่าน → บันทึกข้อมูลสิทธิเข้าใช้งาน
+          SharedPreferences prefs = await SharedPreferences.getInstance();
+          await prefs.setString('mobile', widget.mobile);
+          await prefs.setString('member_no', widget.memberNo);
+          await prefs.setString('br_no', widget.brNo);
+
+          // ไปหน้าตามสถานะ PIN
           final nextPage = widget.statusPin == "0"
               ? InterPinPage(
                   memberNo: widget.memberNo,

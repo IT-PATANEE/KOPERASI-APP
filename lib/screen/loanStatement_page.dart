@@ -662,6 +662,10 @@ class _LoanStatementItemTileState extends State<LoanStatementItemTile> {
     final bool hasReceipt = receiptText.trim().isNotEmpty;
     final bool hasExtraDetails = hasPeriod || hasBalance || hasReceipt;
 
+    final bool isRedAmount = detailText.contains('รับชำระเงินกู้') ||
+        detailText.contains('รับชำระเงินยืม') ||
+        detailText.contains('รับชำระ');
+
     return Column(
       children: [
         InkWell(
@@ -714,7 +718,9 @@ class _LoanStatementItemTileState extends State<LoanStatementItemTile> {
                       totalText,
                       softWrap: true,
                       style: TextStyle(
-                        color: Constants.greenColors,
+                        color: isRedAmount
+                            ? Constants.redColor
+                            : Constants.greenColors,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),

@@ -13,10 +13,10 @@ class AccPage extends StatefulWidget {
   const AccPage({super.key, required this.member_no, required this.br_no});
 
   @override
-  State<AccPage> createState() => _AccPageState();
+  State<AccPage> createState() => AccPageState();
 }
 
-class _AccPageState extends State<AccPage> {
+class AccPageState extends State<AccPage> {
   Future<Map<String, dynamic>>? accountData;
 
   late String _memberNo;
@@ -26,33 +26,55 @@ class _AccPageState extends State<AccPage> {
   String memberName = "Loading...";
 
   List<dynamic> _accounts = [];
+  bool _isLoading = true;
 
   Future<void> fetchAccountData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token =
-        prefs.getString('token'); // Get the token from SharedPreferences
-    if (token != null && token.isNotEmpty) {
+    if (mounted) {
       setState(() {
-        _token = token; // เก็บ token ไว้ในตัวแปร
+        _isLoading = true;
       });
     }
 
-    String url = 'https://online.iscop.co.th/ws/MobileApp/deposit.php';
-    String fullUrl = '$url?member_no=$_memberNo&br_no=$_branchNo&token=$token';
-    final response = await http.get(
-      Uri.parse(fullUrl),
-      headers: {
-        'Authorization': 'Bearer $token', // Send token in headers
-      },
-    );
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('token');
+    String memberNoFromPrefs = prefs.getString('member_no') ?? prefs.getString('username') ?? '';
+    String brNoFromPrefs = prefs.getString('br_no') ?? prefs.getString('branch_no') ?? '005';
 
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> jsonResponse = json.decode(response.body);
-      setState(() {
-        _accounts = jsonResponse['data']; // เก็บข้อมูล accounts
-      });
-    } else {
-      throw Exception('Failed to load data');
+    _memberNo = widget.member_no.isNotEmpty ? widget.member_no : memberNoFromPrefs;
+    _branchNo = widget.br_no.isNotEmpty ? widget.br_no : brNoFromPrefs;
+
+    if (token != null && token.isNotEmpty) {
+      _token = token;
+    }
+
+    try {
+      String url = 'https://online.iscop.co.th/ws/MobileApp/deposit.php';
+      String fullUrl = '$url?member_no=$_memberNo&br_no=$_branchNo&token=$_token';
+      debugPrint("🚀 [DEPOSIT AUTO REFRESH] Fetching URL: $fullUrl");
+
+      final response = await http.get(
+        Uri.parse(fullUrl),
+        headers: {
+          'Authorization': 'Bearer $_token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        if (mounted) {
+          setState(() {
+            _accounts = jsonResponse['data'] ?? [];
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching deposit data: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -61,6 +83,7 @@ class _AccPageState extends State<AccPage> {
     super.initState();
     _memberNo = widget.member_no;
     _branchNo = widget.br_no;
+    // 🟢 ดึงข้อมูลใหม่สดทุกครั้งเมื่อสร้าง/เปิดหน้า
     fetchAccountData();
   }
 
@@ -88,36 +111,40 @@ class _AccPageState extends State<AccPage> {
                 color: Constants.greenColors,
               ),
             )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.stop,
-                        color: Constants.greenColors,
-                        size: 24.0,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'บัญชีของฉัน',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+          : RefreshIndicator(
+              color: Constants.greenColors,
+              onRefresh: fetchAccountData,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.stop,
+                          color: Constants.greenColors,
+                          size: 24.0,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        const Text(
+                          'บัญชีของฉัน',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    itemCount: _accounts.length,
-                    itemBuilder: (context, index) {
+                  Expanded(
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      itemCount: _accounts.length,
+                      itemBuilder: (context, index) {
                       final account = _accounts[index];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16.0),
@@ -149,6 +176,7 @@ class _AccPageState extends State<AccPage> {
                 ),
               ],
             ),
+          ),
     );
   }
 }

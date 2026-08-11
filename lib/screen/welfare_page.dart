@@ -35,10 +35,10 @@ class _WelfarePageState extends State<WelfarePage> {
   @override
   void initState() {
     super.initState();
-    // _memberNo = widget.member_no;
-    // _branchNo = widget.br_no;
-     _memberNo = '48571';
-    _branchNo = '001';
+    _memberNo = widget.member_no;
+    _branchNo = widget.br_no;
+    //  _memberNo = '48571';
+    // _branchNo = '001';
     _token = widget.token ?? '';
     _fetchWelfareData();
   }

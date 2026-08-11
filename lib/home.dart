@@ -23,6 +23,7 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   int _bottomNavIndex = 0;
+  final GlobalKey<AccPageState> _accPageKey = GlobalKey<AccPageState>();
 
   //list of the screen
   late List<Widget> screens;
@@ -39,9 +40,17 @@ class _HomeState extends State<Home> {
           setState(() {
             _bottomNavIndex = index;
           });
+          if (index == 1) {
+            // 🟢 ดึงข้อมูลยอดเงินคงเหลือสดใหม่จากเซิร์ฟเวอร์ทันทีเมื่อสลับมาที่ Tab บัญชีเงินฝาก
+            _accPageKey.currentState?.fetchAccountData();
+          }
         },
       ),
-      AccPage(member_no: widget.member_no, br_no: widget.br_no),
+      AccPage(
+        key: _accPageKey,
+        member_no: widget.member_no,
+        br_no: widget.br_no,
+      ),
       const ReceiptPage(),
       SettingPage(
           member_no: widget.member_no,
@@ -115,6 +124,10 @@ class _HomeState extends State<Home> {
             setState(() {
               _bottomNavIndex = index;
             });
+            if (index == 1) {
+              // 🟢 ดึงข้อมูลยอดเงินคงเหลือสดใหม่จากเซิร์ฟเวอร์ทันทีเมื่อสลับมาที่ Tab บัญชีเงินฝาก
+              _accPageKey.currentState?.fetchAccountData();
+            }
           }),
     );
   }

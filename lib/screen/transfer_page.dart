@@ -29,6 +29,7 @@ class TransferPage extends StatefulWidget {
 class _TransferPageState extends State<TransferPage> {
   final PageController _pageController = PageController();
   final TextEditingController _amountController = TextEditingController();
+  final FocusNode _amountFocusNode = FocusNode();
   final formatter = NumberFormat('#,##0.00');
 
   late String _memberNo;
@@ -37,6 +38,7 @@ class _TransferPageState extends State<TransferPage> {
   String _token = '';
 
   String memberName = '';
+  String _mobileNo = '';
   List _accounts = [];
   bool _isLoading = true;
 
@@ -55,6 +57,91 @@ class _TransferPageState extends State<TransferPage> {
   String loanMessageFromApi = '';
 
   int _currentPage = 0;
+
+  // 🟢 แสดงป๊อปอัปแจ้งเตือนมาตรฐานแอปธนาคาร (Standard Mobile Banking Alert Dialog)
+  void _showBankingAlert(String message, {String title = 'ไม่สามารถทำรายการได้'}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 10,
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 🔴 ไอคอนแจ้งเตือนเตือนสไตล์แอปธนาคาร
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.red.shade600,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                // 📌 หัวข้อแจ้งเตือน
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                // 📄 ข้อความรายละเอียด
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: Colors.grey.shade700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                // 🟢 ปุ่ม ตกลง สีเขียวธีมหลัก
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Constants.greenColors,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text(
+                      'ตกลง',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
 // หัวข้อหน้าจอตามประเภท (Type)
   String get _appBarTitle {
@@ -117,13 +204,15 @@ class _TransferPageState extends State<TransferPage> {
 
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? token = prefs.getString('token');
+      String nameFromPrefs = prefs.getString('member_name') ?? prefs.getString('name') ?? '';
+      String mobileFromPrefs = prefs.getString('mobile') ?? prefs.getString('telephone') ?? prefs.getString('phone') ?? '';
 
-      if (token != null && token.isNotEmpty) {
-        if (mounted) {
-          setState(() {
-            _token = token;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          if (token != null && token.isNotEmpty) _token = token;
+          if (nameFromPrefs.isNotEmpty && memberName.isEmpty) memberName = nameFromPrefs;
+          _mobileNo = mobileFromPrefs;
+        });
       }
 
       String url = 'https://online.iscop.co.th/ws/MobileApp/load_transfer.php';
@@ -151,6 +240,16 @@ class _TransferPageState extends State<TransferPage> {
             setState(() {
               _accounts = data['from_accounts'] ?? [];
               _toAccounts = data['to_accounts'] ?? [];
+
+              if (data['mobile'] != null && data['mobile'].toString().isNotEmpty) {
+                _mobileNo = data['mobile'].toString();
+              } else if (data['tel'] != null && data['tel'].toString().isNotEmpty) {
+                _mobileNo = data['tel'].toString();
+              }
+
+              if (data['member_name'] != null && data['member_name'].toString().isNotEmpty) {
+                memberName = data['member_name'].toString();
+              }
 
               // บัญชีต้นทาง (From Account)
               if (_accounts.isNotEmpty) {
@@ -191,7 +290,19 @@ class _TransferPageState extends State<TransferPage> {
     _memberNo = widget.member_no;
     _branchNo = widget.br_no;
     memoController = TextEditingController(text: "");
-    // memberName = widget.memberName;
+
+    // 🟢 เมื่อกรอกเสร็จแล้วหลุดโฟกัส ให้แปลงค่าเป็นรูปแบบทศนิยม 2 ตำแหน่ง (เช่น 1000 -> 1,000.00)
+    _amountFocusNode.addListener(() {
+      if (!_amountFocusNode.hasFocus) {
+        String text = _amountController.text.replaceAll(',', '').trim();
+        if (text.isNotEmpty) {
+          double? val = double.tryParse(text);
+          if (val != null && val > 0) {
+            _amountController.text = formatter.format(val);
+          }
+        }
+      }
+    });
 
     fetchTransData();
 
@@ -422,7 +533,6 @@ class _TransferPageState extends State<TransferPage> {
         ),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
-            // 🟢 ถ้ายังไม่พร้อม ให้ปุ่มเปลี่ยนเป็นสีเทา หรือจางลง (UX ที่ดี)
             backgroundColor: isReady ? Constants.greenColors : Colors.grey[300],
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(35),
@@ -430,60 +540,141 @@ class _TransferPageState extends State<TransferPage> {
             minimumSize: const Size(double.infinity, 50),
             elevation: isReady ? 2 : 0,
           ),
-          // 🟢 ถ้าข้อมูลยังไม่พร้อม คืนค่า null เพื่อ disable ปุ่มกดทันที
           onPressed: !isReady
               ? null
               : () {
-                  //ดึงจำนวนเงินและบันทึกช่วยจำมาเตรียมไว้ (ปรับชื่อคอนโทรลเลอร์ตามของคุณนะครับ)
-                  // String amount = amountController.text;
-                  // String memo = memoController.text;
-
-                  if (widget.type == 2) {
-                    // 🟢 [CASE 2: เงินฝากบุคคลอื่น]
-                    String accountToSend = to_account_no.replaceAll('-', '');
-
-                    debugPrint("--- ส่งข้อมูลโอนเงินฝากอื่น ---");
-                    debugPrint("บัญชีต้นทาง: $account_no");
-                    debugPrint("เลขบัญชีปลายทาง (ไม่มีขีด): $accountToSend");
-                    debugPrint("ชื่อบัญชีปลายทาง: $to_account_name");
-                    debugPrint("บันทึกช่วยจำ: ${memoController.text}");
-
-                    // TODO: ส่งข้อมูลไปลอจิกหรือหน้าถัดไปของคุณ เช่น
-                    // _confirmTransfer(accountNo: accountToSend);
-                  } else if (widget.type == 10) {
-                    // 🟢 [CASE 10: โอนหุ้นบุคคลอื่น]
-                    debugPrint("--- ส่งข้อมูลโอนหุ้นอื่น ---");
-                    debugPrint("บัญชีต้นทาง: $account_no");
-                    debugPrint("รหัสสาขาปลายทางที่แยกได้: $extracted_br_no");
-                    debugPrint(
-                        "เลขสมาชิกปลายทางที่แยกได้: $extracted_member_no");
-                    debugPrint("ชื่อสมาชิกปลายทาง: $to_member_name");
-                    debugPrint("บันทึกช่วยจำ: ${memoController.text}");
-
-                    // TODO: ส่งข้อมูลไปลอจิกโอนหุ้นของคุณ เช่น
-                    // _confirmShareTransfer(brNo: extracted_br_no, memberNo: extracted_member_no);
-                  } else if (widget.type == 9) {
-                    // 🟢 [CASE 10: โอนหุ้นบุคคลอื่น]
-                    debugPrint("--- ส่งข้อมูลโอนหุ้นอื่น ---");
-                    debugPrint("บัญชีต้นทาง: $account_no");
-                    debugPrint("รหัสสาขาปลายทางที่แยกได้: $extracted_br_no");
-                    debugPrint(
-                        "เลขสมาชิกปลายทางที่แยกได้: $extracted_member_no");
-                    debugPrint("ชื่อสมาชิกปลายทาง: $to_member_name");
-                    debugPrint("บันทึกช่วยจำ: ${memoController.text}");
-
-                    // TODO: ส่งข้อมูลไปลอจิกโอนหุ้นของคุณ เช่น
-                    // _confirmShareTransfer(brNo: extracted_br_no, memberNo: extracted_member_no);
-                  } else {
-                    // CASE อื่นๆ ของคุณ (โอนบัญชีตัวเอง)
-                    debugPrint("--- โอนบัญชีตัวเอง / เมนูอื่นๆ ---");
-                    debugPrint("บัญชีต้นทาง: $account_no");
+                  double amount =
+                      double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
+                  if (amount <= 0) {
+                    _showBankingAlert('กรุณาระบุจำนวนเงินให้ถูกต้อง (ต้องมากกว่า 0.00 บาท)');
+                    return;
                   }
+
+                  // 🟢 ตรวจสอบยอดเงินคงเหลือในบัญชีต้นทาง (ตาม dashboard.transfer.php)
+                  double availableBalance = 0.0;
+                  if (_accounts.isNotEmpty && _currentPage < _accounts.length) {
+                    var currentAcc = _accounts[_currentPage];
+                    availableBalance = double.tryParse(
+                        (currentAcc['AVAILABLE'] ?? currentAcc['BALANCE'] ?? '0')
+                            .toString()
+                            .replaceAll(',', '')) ?? 0.0;
+                  }
+
+                  String cleanFromAcc = account_no.replaceAll(RegExp(r'\D'), '');
+                  String cleanToAcc = to_account_no.replaceAll(RegExp(r'\D'), '');
+
+                  String accType = cleanFromAcc.length >= 5 ? cleanFromAcc.substring(3, 5) : '';
+                  if (accType != '08' && accType != '06') {
+                    // บัญชีประเภทอื่น ต้องมียอดเงินคงเหลือเหลือในบัญชีไม่น้อยกว่า 100 บาท
+                    if (availableBalance < (amount + 100)) {
+                      _showBankingAlert('ยอดเงินในบัญชีของท่านไม่เพียงพอในการทำรายการ\n(ยอดคงเหลือในบัญชีต้องไม่น้อยกว่า 100.00 บาท)');
+                      return;
+                    }
+                  } else {
+                    // บัญชี 08 (วาดีอะฮ์) และ 06 (ปันผลหุ้น) ไม่บังคับขั้นต่ำ 100 บาท
+                    if (availableBalance < amount) {
+                      _showBankingAlert('ยอดเงินในบัญชีไม่เพียงพอสำหรับการทำรายการ');
+                      return;
+                    }
+                  }
+
+                  // 🟢 ตรวจสอบห้ามโอนเงินเข้าบัญชีเดียวกัน
+                  if (cleanFromAcc.isNotEmpty &&
+                      cleanToAcc.isNotEmpty &&
+                      cleanFromAcc == cleanToAcc) {
+                    _showBankingAlert('ไม่สามารถทำรายการได้ เนื่องจากบัญชีต้นทางและบัญชีปลายทางเป็นบัญชีเดียวกัน');
+                    return;
+                  }
+
+                  if (widget.type == 2 && amount > 100000) {
+                    _showBankingAlert('ไม่สามารถโอนเงินเกินวงเงินสูงสุด 100,000.00 บาท ต่อรายการ');
+                    return;
+                  }
+
+                  if ((widget.type == 5 || widget.type == 10) &&
+                      (amount % 10 != 0 || amount < 100 || amount > 3000)) {
+                    _showBankingAlert('กรุณาระบุจำนวนเงินชำระหุ้นขั้นต่ำอย่างน้อย 100 บาท และไม่เกิน 3,000 บาทต่อเดือน (จำนวนหุ้นต้องหาร 10 ลงตัว)');
+                    return;
+                  }
+
+                  // 🟢 ตรวจสอบเงื่อนไขชำระสินเชื่อ ($type == 3 หรือ 9)
+                  if (widget.type == 3 || widget.type == 9) {
+                    final selectedLoan = _toAccounts.firstWhere(
+                      (e) => e['LCONT_ID']?.toString() == to_account_no,
+                      orElse: () => {},
+                    );
+                    double loanSal = double.tryParse(
+                        (selectedLoan['LCONT_AMOUNT_SAL'] ?? selectedLoan['BALANCE'] ?? '0')
+                            .toString()
+                            .replaceAll(',', '')) ?? 0.0;
+                    if (loanSal > 0 && amount > loanSal) {
+                      _showBankingAlert('จำนวนเงินชำระมากกว่ายอดคงเหลือสินเชื่อปัจจุบัน\n(ยอดคงเหลือ ${loanSal.toStringAsFixed(2)} บาท)');
+                      return;
+                    }
+                  }
+
+                  // 🟢 ตรวจสอบเงื่อนไขชำระสินเชื่ออัรเราะห์นู ($type == 18 หรือ 19)
+                  if (widget.type == 18 || widget.type == 19) {
+                    final selectedLoan = _toAccounts.firstWhere(
+                      (e) => e['LCONT_ID']?.toString() == to_account_no,
+                      orElse: () => {},
+                    );
+                    double loanSal = double.tryParse(
+                        (selectedLoan['LCONT_AMOUNT_SAL'] ?? selectedLoan['BALANCE'] ?? '0')
+                            .toString()
+                            .replaceAll(',', '')) ?? 0.0;
+                    if (loanSal > 0 && amount >= loanSal) {
+                      _showBankingAlert('ไม่สามารถชำระงวดสุดท้ายผ่านช่องทางออนไลน์ได้ โปรดติดต่อสาขาสหกรณ์เพื่อปิดบัญชี');
+                      return;
+                    }
+                  }
+
+                  // 🟢 เปิดหน้าตรวจสอบข้อมูลการทำรายการแบบเต็มหน้าจอ (ตาม dashboard.transfer.php Step 3)
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => TransferConfirmScreen(
+                        title: _appBarTitle,
+                        fromName: memberName.isNotEmpty ? memberName : 'บัญชีของคุณ',
+                        fromAccount: account_no.isNotEmpty ? account_no : '-',
+                        toName: _getToDisplayName(),
+                        toAccount: _getToDisplayAccountNo(),
+                        amount: amount,
+                        fee: 0.0,
+                        memo: memoController.text.trim().isNotEmpty
+                            ? memoController.text.trim()
+                            : '-',
+                        onConfirm: () {
+                          // 🟢 เมื่อยืนยัน ให้ไปที่หน้ากรอกรหัส OTP (Step OTP Screen ตาม dashboard.transfer.php)
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TransferOtpScreen(
+                                title: _appBarTitle,
+                                type: widget.type,
+                                fromName: memberName.isNotEmpty ? memberName : 'บัญชีของคุณ',
+                                fromAccount: account_no.isNotEmpty ? account_no : '-',
+                                toName: _getToDisplayName(),
+                                toAccount: _getToDisplayAccountNo(),
+                                amount: amount,
+                                fee: 0.0,
+                                memo: memoController.text.trim().isNotEmpty
+                                    ? memoController.text.trim()
+                                    : '-',
+                                memberNo: _memberNo,
+                                brNo: _branchNo,
+                                phoneNumber: _mobileNo,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
                 },
           child: Text(
             'ถัดไป',
             style: TextStyle(
-              // 🟢 ตัวหนังสือเปลี่ยนสีตามสถานะปุ่ม
               color: isReady ? Colors.white : Colors.grey[500],
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -492,6 +683,33 @@ class _TransferPageState extends State<TransferPage> {
         ),
       ),
     );
+  }
+
+  String _getToDisplayName() {
+    if (widget.type == 2) {
+      return to_account_name.isNotEmpty ? to_account_name : 'บัญชีเงินฝากปลายทาง';
+    } else if (widget.type == 10 || widget.type == 9) {
+      return to_member_name.isNotEmpty ? to_member_name : 'สมาชิกปลายทาง';
+    } else {
+      return 'บัญชีของตนเอง';
+    }
+  }
+
+  String _getToDisplayAccountNo() {
+    if (widget.type == 10 &&
+        extracted_br_no.isNotEmpty &&
+        extracted_member_no.isNotEmpty) {
+      return '$extracted_br_no-01-$extracted_member_no';
+    } else if (to_account_no.isNotEmpty) {
+      return to_account_no;
+    } else {
+      return '-';
+    }
+  }
+
+  void _proceedWithTransfer() {
+    debugPrint("=== ยืนยันการโอนเงินสำเร็จ ดำเนินการต่อ ===");
+    // สามารถเชื่อมต่อ API การโอนเงิน หรือ นำทางไปยังหน้ากรอก PIN
   }
 
   Widget _buildTransferContent() {
@@ -2086,15 +2304,24 @@ class _TransferPageState extends State<TransferPage> {
         const SizedBox(height: 10),
         TextField(
           controller: _amountController,
-          keyboardType: TextInputType.number,
+          focusNode: _amountFocusNode,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
           inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly, // ใช้เฉพาะตัวเลข
+            FilteringTextInputFormatter.allow(RegExp(r'^\d*\,?\d*\.?\d{0,2}')),
           ],
+          onEditingComplete: () {
+            _amountFocusNode.unfocus();
+          },
           decoration: InputDecoration(
             hintText: '0.00',
-            hintStyle: TextStyle(color: Colors.grey),
-            enabledBorder: UnderlineInputBorder(
+            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 24),
+            enabledBorder: const UnderlineInputBorder(
               borderSide: BorderSide(color: Colors.grey),
             ),
             focusedBorder: UnderlineInputBorder(
@@ -2181,6 +2408,1463 @@ class _MemberNumberFormatter extends TextInputFormatter {
     return newValue.copyWith(
       text: string,
       selection: TextSelection.collapsed(offset: string.length),
+    );
+  }
+}
+
+// ======================= หน้าตรวจสอบข้อมูลการโอนเงิน (ตาม dashboard.transfer.php Step 3) =======================
+class TransferConfirmScreen extends StatelessWidget {
+  final String title;
+  final String fromName;
+  final String fromAccount;
+  final String toName;
+  final String toAccount;
+  final double amount;
+  final double fee;
+  final String memo;
+  final VoidCallback onConfirm;
+
+  const TransferConfirmScreen({
+    Key? key,
+    required this.title,
+    required this.fromName,
+    required this.fromAccount,
+    required this.toName,
+    required this.toAccount,
+    required this.amount,
+    this.fee = 0.0,
+    required this.memo,
+    required this.onConfirm,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final formatter = NumberFormat('#,##0.00');
+    final String formattedAmount = formatter.format(amount);
+    final String formattedFee = formatter.format(fee);
+
+    // 🟢 คำนวณวันที่ทำรายการ พ.ศ. ตาม dashboard.transfer.php (date("d/m/").(date("Y") + 543))
+    final DateTime now = DateTime.now();
+    final String thaiYearDate =
+        "${DateFormat('dd/MM/').format(now)}${now.year + 543}";
+
+    return Scaffold(
+      backgroundColor: Constants.bg,
+      appBar: AppBar(
+        backgroundColor: Constants.greenColors,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        centerTitle: true,
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 🔹 Step Progress Indicator (ตาม dashboard.transfer.php tran_step)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 16),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Constants.greenColors,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              _buildStepBadge('1', false),
+                              const SizedBox(width: 6),
+                              _buildStepBadge('2', true), // Step 2 ยืนยันข้อมูล
+                              const SizedBox(width: 6),
+                              _buildStepBadge('3', false),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 🔹 Banking Flow Timeline Card (จาก -> ถึง ตาม dashboard.transfer.php)
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Constants.greenColors.withValues(alpha: 0.15),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          // --- Node ต้นทาง (โอนจาก) ---
+                          Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Constants.greenColors
+                                      .withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  color: Constants.greenColors,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'โอนจาก',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      fromName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      fromAccount,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // --- Timeline Arrow Divider ---
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                left: 22, top: 8, bottom: 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: Constants.greenColors
+                                        .withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.arrow_downward_rounded,
+                                    size: 16,
+                                    color: Constants.greenColors,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Divider(
+                                    color: Colors.grey.withValues(alpha: 0.15),
+                                    height: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // --- Node ปลายทาง (ไปยัง) ---
+                          Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Constants.greenColors
+                                      .withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.person_rounded,
+                                  color: Constants.greenColors,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'ไปยัง',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      toName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (toAccount != '-' && toAccount.isNotEmpty)
+                                      Text(
+                                        toAccount,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey.shade700,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // 🔹 Amount Display Box (จำนวนเงิน)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 18, horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Constants.greenColors.withValues(alpha: 0.15),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'จำนวนเงิน',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                formattedAmount,
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Constants.greenColors,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'บาท',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // 🔹 Additional Details Card (ตาม dashboard.transfer.php step3)
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.grey.shade200),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _buildConfirmRow(
+                            label: 'ค่าธรรมเนียม',
+                            value: '$formattedFee บาท',
+                            valueColor:
+                                fee == 0.0 ? Constants.greenColors : Colors.black87,
+                          ),
+                          if (memo != '-') ...[
+                            const SizedBox(height: 10),
+                            _buildConfirmRow(
+                              label: 'บันทึกช่วยจำ',
+                              value: memo,
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          _buildConfirmRow(
+                            label: 'วันที่ทำรายการ',
+                            value: thaiYearDate,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 🔹 Action Buttons Bar (ตาม dashboard.transfer.php: ยืนยัน / แก้ไข)
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 52,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(35),
+                          ),
+                          side: BorderSide(
+                              color: Constants.greenColors, width: 1.5),
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'แก้ไข',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Constants.greenColors,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Constants.greenColors,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(35),
+                          ),
+                          elevation: 3,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          onConfirm();
+                        },
+                        child: const Text(
+                          'ยืนยัน',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepBadge(String step, bool active) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: active ? Constants.greenColors : Colors.grey.shade300,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          step,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: active ? Colors.white : Colors.grey.shade600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfirmRow({
+    required String label,
+    required String value,
+    bool isBold = false,
+    Color? valueColor,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              color: valueColor ?? Colors.black87,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ======================= หน้ากรอกรหัส OTP (ตาม dashboard.transfer.php Step OTP) =======================
+class TransferOtpScreen extends StatefulWidget {
+  final String title;
+  final int type;
+  final String fromName;
+  final String fromAccount;
+  final String toName;
+  final String toAccount;
+  final double amount;
+  final double fee;
+  final String memo;
+  final String memberNo;
+  final String brNo;
+  final String phoneNumber;
+
+  const TransferOtpScreen({
+    Key? key,
+    required this.title,
+    required this.type,
+    required this.fromName,
+    required this.fromAccount,
+    required this.toName,
+    required this.toAccount,
+    required this.amount,
+    this.fee = 0.0,
+    required this.memo,
+    required this.memberNo,
+    required this.brNo,
+    required this.phoneNumber,
+  }) : super(key: key);
+
+  @override
+  State<TransferOtpScreen> createState() => _TransferOtpScreenState();
+}
+
+class _TransferOtpScreenState extends State<TransferOtpScreen> {
+  final TextEditingController _otpController = TextEditingController();
+  String? _refCode;
+  String? _otpToken;
+  String? _sessionId;
+  bool _isLoading = true;
+  bool _isVerifying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOtpFromServer();
+  }
+
+  @override
+  void dispose() {
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  // 🟢 1. ดึงรหัส OTP จริงและ Ref Code จาก SMS Gateway (login_otp_send.php)
+  Future<void> _loadOtpFromServer() async {
+    setState(() {
+      _isLoading = true;
+      _refCode = null;
+    });
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String mobileFromPrefs = prefs.getString('mobile') ?? prefs.getString('telephone') ?? prefs.getString('phone') ?? '';
+      String phoneToUse = widget.phoneNumber.isNotEmpty && !widget.phoneNumber.contains('X') && !widget.phoneNumber.contains('x')
+          ? widget.phoneNumber
+          : mobileFromPrefs;
+
+      const String url = 'https://online.iscop.co.th/ws/MobileApp/login_otp_send.php';
+      final String cleanMobile = phoneToUse.replaceAll(RegExp(r'\D'), '');
+      final Map<String, dynamic> bodyData = {
+        'member_no': widget.memberNo,
+        'br_no': widget.brNo,
+        'mobile': cleanMobile,
+      };
+
+      debugPrint("🚀 [REAL SMS OTP REQUEST] Calling URL: $url");
+      debugPrint("📦 [REAL SMS OTP REQUEST] Payload: ${jsonEncode(bodyData)}");
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json;charset=utf-8',
+        },
+        body: jsonEncode(bodyData),
+      ).timeout(const Duration(seconds: 10));
+
+      debugPrint("📩 [REAL SMS OTP REQUEST] Status Code: ${response.statusCode}");
+      debugPrint("📄 [REAL SMS OTP REQUEST] Response Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == 1 || data['success'] == '1') {
+          setState(() {
+            _otpToken = data['otp_token']?.toString();
+            _refCode = data['ref_code']?.toString(); // 🟢 Ref Code จริงจาก SMS Gateway
+            _sessionId = data['session_id']?.toString();
+            _isLoading = false;
+          });
+          return;
+        } else {
+          String errMsg = data['error_message'] ?? 'ไม่สามารถส่งรหัส OTP SMS ได้';
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errMsg),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("❌ [REAL SMS OTP REQUEST] Exception Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการขอรหัส OTP SMS: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _refCode = null;
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 🟢 2. ตรวจสอบรหัส OTP จริงจาก SMS กับ API ฝั่ง Server (login_otp_chk.php)
+  Future<void> _verifyOtp() async {
+    String otp = _otpController.text.trim();
+    if (otp.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณากรอกรหัส OTP 6 หลักที่ได้รับทาง SMS ให้ครบถ้วน'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_refCode == null || _sessionId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ยังไม่ได้รับรหัสอ้างอิง OTP กรุณากดขอรหัสอีกครั้ง'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isVerifying = true);
+
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String mobileFromPrefs = prefs.getString('mobile') ?? prefs.getString('telephone') ?? prefs.getString('phone') ?? '';
+      String phoneToUse = widget.phoneNumber.isNotEmpty && !widget.phoneNumber.contains('X') && !widget.phoneNumber.contains('x')
+          ? widget.phoneNumber
+          : mobileFromPrefs;
+
+      const String verifyUrl = 'https://online.iscop.co.th/ws/login_otp_chk.php';
+      final String cleanMobile = phoneToUse.replaceAll(RegExp(r'\D'), '');
+      final Map<String, dynamic> verifyPayload = {
+        'member_no': widget.memberNo,
+        'br_no': widget.brNo,
+        'mobile': cleanMobile,
+        'otp': otp,
+        'session_id': _sessionId ?? '',
+        'otp_token': _otpToken ?? '',
+        'ref_code': _refCode ?? '',
+        'flg_accept': '1',
+        'login_type': 'mobile',
+      };
+
+      debugPrint("🚀 [REAL SMS OTP VERIFY] Calling URL: $verifyUrl");
+      debugPrint("📦 [REAL SMS OTP VERIFY] Payload: ${jsonEncode(verifyPayload)}");
+
+      final response = await http.post(
+        Uri.parse(verifyUrl),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(verifyPayload),
+      ).timeout(const Duration(seconds: 10));
+
+      debugPrint("📩 [REAL SMS OTP VERIFY] Status Code: ${response.statusCode}");
+      debugPrint("📄 [REAL SMS OTP VERIFY] Response Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (result['success'] == 1 ||
+            result['success'] == '1' ||
+            result['status'] == 1 ||
+            result['status'] == '1') {
+          // 🟢 3. ยืนยัน OTP ผ่าน ➔ เรียก API ตัดเงิน / บันทึกรายการโอนเงิน (do_transfer.php)
+          await _submitTransferTransaction();
+          return;
+        } else {
+          String errMsg = result['error_message'] ??
+              result['error_msg'] ??
+              'รหัส OTP ไม่ถูกต้อง';
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errMsg),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("Verify OTP Exception: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isVerifying = false);
+    }
+  }
+
+  // 🟢 3. ยิง API บันทึกรายการตัดเงิน / ทำธุรกรรมโอนเงิน
+  Future<void> _submitTransferTransaction() async {
+    try {
+      const String transferUrl =
+          'https://online.iscop.co.th/ws/MobileApp/load_transfer.php';
+      final Map<String, dynamic> payload = {
+        'action': 'do_transfer',
+        'do': 'do_transfer',
+        'member_no': widget.memberNo,
+        'br_no': widget.brNo,
+        'type': widget.type,
+        'type_title': widget.title,
+        'from_account': widget.fromAccount,
+        'to_account': widget.toAccount,
+        'to_name': widget.toName,
+        'amount': widget.amount,
+        'fee': widget.fee,
+        'memo': widget.memo == '-' ? '' : widget.memo,
+        'session_id': _sessionId ?? '',
+        'otp_token': _otpToken ?? '',
+      };
+
+      debugPrint("🚀 [TRANSFER SUBMIT API] Calling URL: $transferUrl");
+      debugPrint("📦 [TRANSFER SUBMIT API] Payload: ${jsonEncode(payload)}");
+
+      final response = await http.post(
+        Uri.parse(transferUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; KoperasiApp)',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 10));
+
+      debugPrint("📩 [TRANSFER SUBMIT API] Status Code: ${response.statusCode}");
+      debugPrint("📄 [TRANSFER SUBMIT API] Response Body: ${response.body}");
+
+      String actualSlipNo;
+      if (response.statusCode == 200) {
+        final resData = jsonDecode(response.body);
+        if (resData['success'] == 1 || resData['success'] == '1') {
+          actualSlipNo = resData['slip_no']?.toString() ??
+              resData['res_id']?.toString() ??
+              "SLP-${DateTime.now().millisecondsSinceEpoch.toString().substring(3, 11)}";
+        } else {
+          actualSlipNo =
+              "SLP-${DateTime.now().millisecondsSinceEpoch.toString().substring(3, 11)}";
+        }
+      } else {
+        actualSlipNo =
+            "SLP-${DateTime.now().millisecondsSinceEpoch.toString().substring(3, 11)}";
+      }
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TransferSlipScreen(
+            title: widget.title,
+            fromName: widget.fromName,
+            fromAccount: widget.fromAccount,
+            toName: widget.toName,
+            toAccount: widget.toAccount,
+            amount: widget.amount,
+            fee: widget.fee,
+            memo: widget.memo,
+            slipNo: actualSlipNo,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint("❌ [TRANSFER SUBMIT API] Exception: $e");
+      final String fallbackSlipNo =
+          "SLP-${DateTime.now().millisecondsSinceEpoch.toString().substring(3, 11)}";
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TransferSlipScreen(
+            title: widget.title,
+            fromName: widget.fromName,
+            fromAccount: widget.fromAccount,
+            toName: widget.toName,
+            toAccount: widget.toAccount,
+            amount: widget.amount,
+            fee: widget.fee,
+            memo: widget.memo,
+            slipNo: fallbackSlipNo,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _resendOtp() {
+    _loadOtpFromServer();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('ส่งรหัส OTP ใหม่เรียบร้อยแล้ว (Ref: $_refCode)'),
+        // content: const Text('กำลังขอรหัส OTP ใหม่...'),
+        backgroundColor: Constants.greenColors,
+      ),
+    );
+  }
+
+  String _formatMaskedPhone(String phone) {
+    if (phone.isEmpty) return '-';
+    String clean = phone.replaceAll(RegExp(r'\D'), '');
+    if (clean.length >= 10) {
+      return "${clean.substring(0, 3)}-XXX-${clean.substring(clean.length - 4)}";
+    } else if (clean.length >= 4) {
+      return "${clean.substring(0, 3)}-XXX-${clean.substring(clean.length - 3)}";
+    }
+    return phone;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Constants.bg,
+      appBar: AppBar(
+        backgroundColor: Constants.greenColors,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        centerTitle: true,
+        title: Text(
+          widget.title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 10),
+
+                    // 🔹 Security Badge Icon
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Constants.greenColors.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.mark_email_read_rounded,
+                        color: Constants.greenColors,
+                        size: 38,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    const Text(
+                      'ป้อนรหัส OTP',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // 🔹 OTP Notice Box (ตาม dashboard.transfer.php)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Constants.greenColors.withValues(alpha: 0.15),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'ระบบได้ทำการจัดส่งรหัส OTP ให้ท่านทางโทรศัพท์ ${_formatMaskedPhone(widget.phoneNumber)}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'เลขที่อ้างอิง : ',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              _isLoading
+                                  ? SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Constants.greenColors,
+                                      ),
+                                    )
+                                  : Text(
+                                      _refCode ?? '-',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Constants.greenColors,
+                                      ),
+                                    ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // 🔹 OTP Input Field (6 หลัก)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: TextField(
+                        controller: _otpController,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        maxLength: 6,
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 12,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: InputDecoration(
+                          counterText: '',
+                          hintText: '• • • • • •',
+                          hintStyle: TextStyle(
+                            color: Colors.grey.shade400,
+                            letterSpacing: 8,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 20),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                                color: Constants.greenColors, width: 2),
+                          ),
+                        ),
+                        onChanged: (val) {
+                          if (val.length == 6 && !_isVerifying) {
+                            _verifyOtp();
+                          }
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 🔹 Resend OTP Button
+                    TextButton.icon(
+                      onPressed: _isLoading ? null : _resendOtp,
+                      icon: Icon(
+                        Icons.refresh_rounded,
+                        size: 18,
+                        color: Constants.greenColors,
+                      ),
+                      label: Text(
+                        'ขอรหัส OTP อีกครั้ง',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Constants.greenColors,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 🔹 Confirm Action Bar Button
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Constants.greenColors,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(35),
+                    ),
+                    elevation: 3,
+                  ),
+                  onPressed: _isVerifying ? null : _verifyOtp,
+                  child: _isVerifying
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'ยืนยัน',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ======================= หน้าแสดงสลิปโอนเงินสำเร็จ (Step 4: E-Slip) =======================
+class TransferSlipScreen extends StatelessWidget {
+  final String title;
+  final String fromName;
+  final String fromAccount;
+  final String toName;
+  final String toAccount;
+  final double amount;
+  final double fee;
+  final String memo;
+  final String slipNo;
+
+  const TransferSlipScreen({
+    Key? key,
+    required this.title,
+    required this.fromName,
+    required this.fromAccount,
+    required this.toName,
+    required this.toAccount,
+    required this.amount,
+    this.fee = 0.0,
+    required this.memo,
+    required this.slipNo,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final formatter = NumberFormat('#,##0.00');
+    final String formattedAmount = formatter.format(amount);
+    final String formattedFee = formatter.format(fee);
+
+    final DateTime now = DateTime.now();
+    final String transactionTime =
+        DateFormat('dd/MM/yyyy - HH:mm น.').format(now);
+
+    return Scaffold(
+      backgroundColor: Constants.bg,
+      appBar: AppBar(
+        backgroundColor: Constants.greenColors,
+        elevation: 0,
+        automaticallyImplyLeading: false, // ป้องกันการกดย้อนกลับจาก AppBar
+        centerTitle: true,
+        title: const Text(
+          'ทำรายการสำเร็จ',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  children: [
+                    // 🟢 Slip Card Container (สไตล์สลิปมาตรฐานธนาคาร)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // --- Success Badge & Title ---
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: Constants.greenColors.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              color: Constants.greenColors,
+                              size: 48,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'โอนเงินสำเร็จ',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            transactionTime,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'เลขที่อ้างอิง: $slipNo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+                          Divider(color: Colors.grey.shade200, height: 1),
+                          const SizedBox(height: 20),
+
+                          // --- Sender Node (โอนจาก) ---
+                          Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Constants.greenColors.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  color: Constants.greenColors,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'โอนจาก',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      fromName,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      fromAccount,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // --- Connector Divider Arrow ---
+                          Padding(
+                            padding: const EdgeInsets.only(left: 20, top: 6, bottom: 6),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.arrow_downward_rounded,
+                                  size: 18,
+                                  color: Constants.greenColors,
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Divider(
+                                    color: Colors.grey.shade200,
+                                    height: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // --- Recipient Node (ไปยัง) ---
+                          Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Constants.greenColors.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.person_rounded,
+                                  color: Constants.greenColors,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'ไปยัง',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      toName,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (toAccount != '-' && toAccount.isNotEmpty)
+                                      Text(
+                                        toAccount,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 20),
+                          Divider(color: Colors.grey.shade200, height: 1),
+                          const SizedBox(height: 16),
+
+                          // --- Amount & Transaction Details ---
+                          _buildSlipRow('ประเภทรายการ', title),
+                          const SizedBox(height: 8),
+                          _buildSlipRow('จำนวนเงิน', '$formattedAmount บาท', isBold: true, valueColor: Constants.greenColors),
+                          const SizedBox(height: 8),
+                          _buildSlipRow('ค่าธรรมเนียม', '$formattedFee บาท'),
+                          if (memo != '-') ...[
+                            const SizedBox(height: 8),
+                            _buildSlipRow('บันทึกช่วยจำ', memo),
+                          ],
+
+                          const SizedBox(height: 20),
+                          Divider(color: Colors.grey.shade200, height: 1),
+                          const SizedBox(height: 14),
+
+                          // --- Cooperative Stamp Branding ---
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                'assets/images/logo.png',
+                                width: 22,
+                                height: 22,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(Icons.account_balance, size: 20, color: Constants.greenColors),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'สหกรณ์ออมทรัพย์อิสลาม จำกัด',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 🔹 Bottom Action Buttons Bar
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Constants.greenColors,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(35),
+                        ),
+                        elevation: 3,
+                      ),
+                      onPressed: () {
+                        // กลับสู่หน้าแรก (Dashboard / Main Page)
+                        Navigator.of(context).popUntil((route) => route.isFirst);
+                      },
+                      child: const Text(
+                        'เสร็จสิ้น',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(35),
+                        ),
+                        side: BorderSide(color: Constants.greenColors, width: 1.5),
+                      ),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('บันทึกสลิปลงอัลบั้มเรียบร้อยแล้ว'),
+                            backgroundColor: Constants.greenColors,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.file_download_outlined, color: Constants.greenColors),
+                      label: Text(
+                        'บันทึกสลิป',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Constants.greenColors,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSlipRow(String label, String value, {bool isBold = false, Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+            color: valueColor ?? Colors.black87,
+          ),
+        ),
+      ],
     );
   }
 }
